@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:amoy": "hardhat run scripts/deploy.ts --network amoy",
+    "demo:amoy": "hardhat run scripts/demo.ts --network amoy",
+    "demo:local": "hardhat run scripts/demo-local.ts"
   },
   "keywords": [],
   "author": "",
@@ -20,7 +24,7 @@
     "chai": "^6.2.2",
     "ethers": "^6.16.0",
     "forge-std": "github:foundry-rs/forge-std#v1.9.4",
-    "hardhat": "^3.1.10",
+    "hardhat": "^3.1.11",
     "mocha": "^11.7.5",
     "typescript": "~5.8.0"
   },

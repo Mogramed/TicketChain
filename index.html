@@ -1,57 +1,152 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>Billetterie ChainTicket</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.11.1/ethers.umd.min.js"></script>
-    <style>
-        body { font-family: sans-serif; background: #1a1a2e; color: white; text-align: center; padding: 50px; }
-        .card { background: #16213e; padding: 30px; border-radius: 15px; max-width: 500px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        button { background: #e94560; color: white; border: none; padding: 15px 25px; border-radius: 5px; cursor: pointer; font-size: 18px; margin: 10px; }
-        #status { margin-top: 20px; padding: 10px; border-radius: 5px; background: #0f3460; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChainTicket Mint Demo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.5/ethers.umd.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      background: linear-gradient(160deg, #0b132b, #1c2541);
+      color: #ffffff;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .card {
+      width: min(540px, 100%);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 6px;
+      font-size: 1.7rem;
+    }
+
+    p {
+      margin-top: 0;
+      opacity: 0.9;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-top: 8px;
+      background: #fca311;
+      color: #111827;
+      font-weight: 700;
+    }
+
+    button.secondary {
+      background: #3a86ff;
+      color: #ffffff;
+    }
+
+    #status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 10px;
+      background: rgba(17, 24, 39, 0.7);
+      min-height: 24px;
+      white-space: pre-wrap;
+    }
+
+    code {
+      color: #ffd166;
+    }
+  </style>
 </head>
 <body>
-    <div class="card">
-        <h1>🎟️ ChainTicket Festival</h1>
-        <p>Prix du billet : <b>0.1 ETH</b></p>
-        
-        <button id="connectBtn">Connecter MetaMask</button>
-        <button id="buyBtn" style="display:none;">Acheter mon Billet</button>
-        
-        <div id="status">Veuillez connecter votre portefeuille.</div>
-    </div>
+  <div class="card">
+    <h1>ChainTicket V1 Mint</h1>
+    <p>Simple page for local or Amoy mint tests.</p>
+    <p>Replace <code>CONTRACT_ADDRESS</code> in the script before use.</p>
 
-    <script>
-        const contractAddress = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707";
-        const abi = ["function mintTicket() public payable"];
+    <button id="connectBtn" class="secondary">Connect MetaMask</button>
+    <button id="buyBtn" disabled>Mint Primary Ticket</button>
 
-        let signer, contract;
+    <div id="status">Connect your wallet to continue.</div>
+  </div>
 
-        document.getElementById('connectBtn').onclick = async () => {
-            if (window.ethereum) {
-                const provider = new ethers.BrowserProvider(window.ethereum);
-                signer = await provider.getSigner();
-                contract = new ethers.Contract(contractAddress, abi, signer);
-                
-                document.getElementById('status').innerText = "Connecté : " + await signer.getAddress();
-                document.getElementById('connectBtn').style.display = 'none';
-                document.getElementById('buyBtn').style.display = 'inline-block';
-            } else {
-                alert("Installez MetaMask !");
-            }
-        };
+  <script>
+    const CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000";
+    const ABI = [
+      "function mintPrimary() external payable",
+      "function primaryPrice() external view returns (uint256)"
+    ];
 
-        document.getElementById('buyBtn').onclick = async () => {
-            try {
-                document.getElementById('status').innerText = "⌛ Transaction en cours...";
-                const tx = await contract.mintTicket({ value: ethers.parseEther("0.1") });
-                await tx.wait();
-                document.getElementById('status').innerHTML = "✅ <b>Succès !</b> Billet acheté avec succès.";
-            } catch (err) {
-                document.getElementById('status').innerText = "❌ Erreur ou limite atteinte.";
-            }
-        };
-    </script>
+    let signer;
+    let contract;
+
+    const statusEl = document.getElementById("status");
+    const connectBtn = document.getElementById("connectBtn");
+    const buyBtn = document.getElementById("buyBtn");
+
+    function setStatus(message) {
+      statusEl.innerText = message;
+    }
+
+    connectBtn.onclick = async () => {
+      if (!window.ethereum) {
+        setStatus("MetaMask is not installed.");
+        return;
+      }
+
+      if (CONTRACT_ADDRESS === "0x0000000000000000000000000000000000000000") {
+        setStatus("Set CONTRACT_ADDRESS first.");
+        return;
+      }
+
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = await provider.getSigner();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+        const address = await signer.getAddress();
+        const primaryPrice = await contract.primaryPrice();
+
+        buyBtn.disabled = false;
+        setStatus(
+          "Connected: " +
+            address +
+            "\nPrimary price: " +
+            ethers.formatEther(primaryPrice) +
+            " POL"
+        );
+      } catch (error) {
+        setStatus("Connection failed: " + (error?.message || "unknown error"));
+      }
+    };
+
+    buyBtn.onclick = async () => {
+      if (!contract) {
+        setStatus("Connect wallet first.");
+        return;
+      }
+
+      try {
+        setStatus("Sending mint transaction...");
+        const price = await contract.primaryPrice();
+        const tx = await contract.mintPrimary({ value: price });
+        await tx.wait();
+        setStatus("Mint success\nTx hash: " + tx.hash);
+      } catch (error) {
+        setStatus("Mint failed: " + (error?.shortMessage || error?.message || "unknown"));
+      }
+    };
+  </script>
 </body>
 </html>

@@ -10,13 +10,33 @@ import * as Contracts from "./index.js";
 
 declare module "@nomicfoundation/hardhat-ethers/types" {
   interface HardhatEthersHelpers extends HardhatEthersHelpersBase {
-  getContractFactory(name: 'ChainTicket', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.ChainTicket__factory>
+  getContractFactory(name: 'CheckInRegistry', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.CheckInRegistry__factory>
+getContractFactory(name: 'ICheckInRegistry', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.ICheckInRegistry__factory>
+getContractFactory(name: 'ITicketNFT', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.ITicketNFT__factory>
+getContractFactory(name: 'ITicketSystemState', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.ITicketSystemState__factory>
+getContractFactory(name: 'Marketplace', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.Marketplace__factory>
+getContractFactory(name: 'TicketNFT', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.TicketNFT__factory>
 
-  getContractAt(name: 'ChainTicket', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.ChainTicket>
+  getContractAt(name: 'CheckInRegistry', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.CheckInRegistry>
+getContractAt(name: 'ICheckInRegistry', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.ICheckInRegistry>
+getContractAt(name: 'ITicketNFT', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.ITicketNFT>
+getContractAt(name: 'ITicketSystemState', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.ITicketSystemState>
+getContractAt(name: 'Marketplace', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.Marketplace>
+getContractAt(name: 'TicketNFT', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.TicketNFT>
 
-  deployContract(name: 'ChainTicket', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.ChainTicket>
+  deployContract(name: 'CheckInRegistry', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.CheckInRegistry>
+deployContract(name: 'ICheckInRegistry', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.ICheckInRegistry>
+deployContract(name: 'ITicketNFT', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.ITicketNFT>
+deployContract(name: 'ITicketSystemState', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.ITicketSystemState>
+deployContract(name: 'Marketplace', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.Marketplace>
+deployContract(name: 'TicketNFT', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.TicketNFT>
 
-  deployContract(name: 'ChainTicket', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.ChainTicket>
+  deployContract(name: 'CheckInRegistry', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.CheckInRegistry>
+deployContract(name: 'ICheckInRegistry', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.ICheckInRegistry>
+deployContract(name: 'ITicketNFT', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.ITicketNFT>
+deployContract(name: 'ITicketSystemState', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.ITicketSystemState>
+deployContract(name: 'Marketplace', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.Marketplace>
+deployContract(name: 'TicketNFT', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.TicketNFT>
 
     // default types
     getContractFactory(

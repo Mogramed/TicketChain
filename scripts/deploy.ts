@@ -1,33 +1,136 @@
-import { ethers } from "ethers";
-import * as fs from "fs";
+import { network } from "hardhat";
 
-async function main() {
-    console.log("🚀 Lancement du déploiement...");
+const { ethers } = await network.connect();
 
-    // 1. On se connecte à la blockchain locale
-    const provider = new ethers.JsonRpcProvider("http://127.0.0.1:8545");
-    const organisateur = await provider.getSigner(0);
+function parseCsvAddresses(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
 
-    // 2. On lit le contrat compilé sur le disque dur
-    const artifactJson = fs.readFileSync("./artifacts/contracts/ChainTicket.sol/ChainTicket.json", "utf8");
-    const artifact = JSON.parse(artifactJson);
+function explorerAddressLink(address: string): string {
+  return `https://amoy.polygonscan.com/address/${address}`;
+}
 
-    // 3. On prépare l'usine à contrats
-    const factory = new ethers.ContractFactory(artifact.abi, artifact.bytecode, organisateur);
-    
-    // 4. On déploie ! (Prix : 0.1 ETH, Quantité : 100)
-    const prixBillet = ethers.parseEther("0.1");
-    const ticketContract = await factory.deploy(prixBillet, 100);
-    
-    await ticketContract.waitForDeployment();
-    
-    const contractAddress = await ticketContract.getAddress();
-    console.log("\n✅ DÉPLOIEMENT RÉUSSI !");
-    console.log("📍 ADRESSE DU CONTRAT :", contractAddress);
-    console.log("\n⚠️ Garde cette adresse précieusement, on va la mettre dans notre page Web !");
+function explorerTxLink(txHash: string): string {
+  return `https://amoy.polygonscan.com/tx/${txHash}`;
+}
+
+async function main(): Promise<void> {
+  const signers = await ethers.getSigners();
+  if (signers.length === 0) {
+    throw new Error(
+      "No deployer account configured for this network. Set PRIVATE_KEY in .env (0x...) so Hardhat can sign Amoy transactions.",
+    );
+  }
+  const deployer = signers[0];
+
+  const treasuryFromEnv = process.env.TREASURY_ADDRESS;
+  let treasury = deployer.address;
+  if (treasuryFromEnv) {
+    if (!ethers.isAddress(treasuryFromEnv)) {
+      throw new Error(
+        `Invalid TREASURY_ADDRESS in .env: ${treasuryFromEnv}`,
+      );
+    }
+    treasury = treasuryFromEnv;
+  }
+
+  const name = process.env.TICKET_NAME ?? "ChainTicket Event";
+  const symbol = process.env.TICKET_SYMBOL ?? "CTK";
+  const baseTokenURI =
+    process.env.BASE_TOKEN_URI ?? "ipfs://chainticket/base/";
+  const collectibleBaseURI =
+    process.env.COLLECTIBLE_BASE_URI ?? "ipfs://chainticket/collectible/";
+  const primaryPricePol = process.env.PRIMARY_PRICE_POL ?? "0.1";
+  const maxSupplyRaw = process.env.MAX_SUPPLY ?? "100";
+
+  const primaryPrice = ethers.parseEther(primaryPricePol);
+  const maxSupply = BigInt(maxSupplyRaw);
+
+  const scannerAddresses = parseCsvAddresses(
+    process.env.SCANNER_ADDRESSES ?? "",
+  );
+  const uniqueScannerAddresses = [
+    ...new Set(
+      scannerAddresses.filter((address) => {
+        const isValid = ethers.isAddress(address);
+        if (!isValid) {
+          console.warn(`Skipping invalid scanner address: ${address}`);
+        }
+        return isValid;
+      }),
+    ),
+  ];
+
+  console.log("Deploying ChainTicket V1 contracts to Amoy...");
+  console.log(`Deployer: ${deployer.address}`);
+  console.log(`Treasury: ${treasury}`);
+
+  const ticketFactory = await ethers.getContractFactory("TicketNFT", deployer);
+  const ticket = await ticketFactory.deploy(
+    name,
+    symbol,
+    primaryPrice,
+    maxSupply,
+    treasury,
+    baseTokenURI,
+    collectibleBaseURI,
+  );
+  await ticket.waitForDeployment();
+  const ticketAddress = await ticket.getAddress();
+  console.log(`TicketNFT deployed: ${ticketAddress}`);
+
+  const checkInFactory = await ethers.getContractFactory(
+    "CheckInRegistry",
+    deployer,
+  );
+  const checkInRegistry = await checkInFactory.deploy(ticketAddress);
+  await checkInRegistry.waitForDeployment();
+  const checkInRegistryAddress = await checkInRegistry.getAddress();
+  console.log(`CheckInRegistry deployed: ${checkInRegistryAddress}`);
+
+  const marketplaceFactory = await ethers.getContractFactory(
+    "Marketplace",
+    deployer,
+  );
+  const marketplace = await marketplaceFactory.deploy(ticketAddress, treasury);
+  await marketplace.waitForDeployment();
+  const marketplaceAddress = await marketplace.getAddress();
+  console.log(`Marketplace deployed: ${marketplaceAddress}`);
+
+  const setRegistryTx = await ticket.setCheckInRegistry(checkInRegistryAddress);
+  await setRegistryTx.wait();
+  console.log(`setCheckInRegistry tx: ${explorerTxLink(setRegistryTx.hash)}`);
+
+  const setMarketplaceTx = await ticket.setMarketplace(marketplaceAddress);
+  await setMarketplaceTx.wait();
+  console.log(`setMarketplace tx: ${explorerTxLink(setMarketplaceTx.hash)}`);
+
+  for (const scannerAddress of uniqueScannerAddresses) {
+    const grantTx = await checkInRegistry.grantScanner(scannerAddress);
+    await grantTx.wait();
+    console.log(
+      `Granted SCANNER_ROLE to ${scannerAddress}: ${explorerTxLink(
+        grantTx.hash,
+      )}`,
+    );
+  }
+
+  console.log("");
+  console.log("Deployment summary");
+  console.log(`TicketNFT: ${ticketAddress}`);
+  console.log(`Marketplace: ${marketplaceAddress}`);
+  console.log(`CheckInRegistry: ${checkInRegistryAddress}`);
+  console.log("");
+  console.log("Polygonscan links");
+  console.log(`TicketNFT: ${explorerAddressLink(ticketAddress)}`);
+  console.log(`Marketplace: ${explorerAddressLink(marketplaceAddress)}`);
+  console.log(`CheckInRegistry: ${explorerAddressLink(checkInRegistryAddress)}`);
 }
 
 main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
+  console.error(error);
+  process.exitCode = 1;
 });

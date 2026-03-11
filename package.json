@@ -7,7 +7,12 @@
     "test": "hardhat test",
     "deploy:amoy": "hardhat run scripts/deploy.ts --network amoy",
     "demo:amoy": "hardhat run scripts/demo.ts --network amoy",
-    "demo:local": "hardhat run scripts/demo-local.ts"
+    "demo:local": "hardhat run scripts/demo-local.ts",
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:ci": "npm --prefix frontend run ci:check",
+    "bff:dev": "npm --prefix bff run dev",
+    "bff:build": "npm --prefix bff run build",
+    "bff:test": "npm --prefix bff run test"
   },
   "keywords": [],
   "author": "",

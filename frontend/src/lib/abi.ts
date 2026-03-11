@@ -1,0 +1,46 @@
+export const TICKET_NFT_ABI = [
+  "function DEFAULT_ADMIN_ROLE() view returns (bytes32)",
+  "function PAUSER_ROLE() view returns (bytes32)",
+  "function hasRole(bytes32 role, address account) view returns (bool)",
+  "function primaryPrice() view returns (uint256)",
+  "function maxSupply() view returns (uint256)",
+  "function totalMinted() view returns (uint256)",
+  "function maxPerWallet() view returns (uint256)",
+  "function paused() view returns (bool)",
+  "function collectibleMode() view returns (bool)",
+  "function isUsed(uint256 tokenId) view returns (bool)",
+  "function tokenURI(uint256 tokenId) view returns (string)",
+  "function ownerOf(uint256 tokenId) view returns (address)",
+  "function balanceOf(address owner) view returns (uint256)",
+  "function getApproved(uint256 tokenId) view returns (address)",
+  "function isApprovedForAll(address owner, address operator) view returns (bool)",
+  "function mintPrimary() payable",
+  "function approve(address spender, uint256 tokenId)",
+  "function pause()",
+  "function unpause()",
+  "function setCollectibleMode(bool enabled)",
+  "event PrimaryMinted(address indexed buyer, uint256 indexed tokenId, uint256 paidAmount)",
+  "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
+  "event CollectibleModeUpdated(bool enabled)",
+] as const;
+
+export const MARKETPLACE_ABI = [
+  "function DEFAULT_ADMIN_ROLE() view returns (bytes32)",
+  "function hasRole(bytes32 role, address account) view returns (bool)",
+  "function list(uint256 tokenId, uint256 price)",
+  "function cancel(uint256 tokenId)",
+  "function buy(uint256 tokenId) payable",
+  "function getListing(uint256 tokenId) view returns (tuple(address seller, uint256 price))",
+  "event Listed(uint256 indexed tokenId, address indexed seller, uint256 price)",
+  "event Cancelled(uint256 indexed tokenId, address indexed actor)",
+  "event Sold(uint256 indexed tokenId, address indexed seller, address indexed buyer, uint256 price, uint256 feeAmount)",
+] as const;
+
+export const CHECK_IN_REGISTRY_ABI = [
+  "function DEFAULT_ADMIN_ROLE() view returns (bytes32)",
+  "function SCANNER_ROLE() view returns (bytes32)",
+  "function hasRole(bytes32 role, address account) view returns (bool)",
+  "function isUsed(uint256 tokenId) view returns (bool)",
+  "function markUsed(uint256 tokenId)",
+  "event TicketMarkedUsed(uint256 indexed tokenId, address indexed scanner)",
+] as const;

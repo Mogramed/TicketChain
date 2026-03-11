@@ -1,0 +1,6 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Sora:wght@500;600;700&display=swap");
+@import "./app-base.css";
+@import "./app-layout.css";
+@import "./app-components.css";
+@import "./app-routes.css";
+@import "./app-responsive.css";

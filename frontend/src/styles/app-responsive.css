@@ -1,0 +1,137 @@
+@media (max-width: 1240px) {
+  .arena-shell {
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: var(--arena-space-5);
+  }
+
+  .safety-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .safety-feed {
+    grid-column: span 2;
+  }
+
+}
+
+@media (max-width: 940px) {
+  .arena-page {
+    padding: var(--arena-space-4);
+  }
+
+  .arena-shell {
+    display: block;
+  }
+
+  .arena-main {
+    padding-bottom: 100px;
+  }
+
+  .utility-bar {
+    position: static;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ui-button-group.compact {
+    width: 100%;
+  }
+
+  .ui-button-group.compact > * {
+    flex: 1 1 180px;
+  }
+
+  .wallet-select {
+    min-width: 0;
+  }
+
+  .scanner-layout,
+  .settings-grid,
+  .market-form,
+  .advanced-grid,
+  .market-toolbar-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .safety-grid,
+  .ticket-grid,
+  .listing-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .safety-feed {
+    grid-column: auto;
+  }
+
+  .ui-page-header-actions {
+    width: 100%;
+    justify-items: start;
+  }
+
+  .ui-page-header-primary,
+  .ui-page-header-secondary {
+    justify-content: flex-start;
+  }
+
+  .ui-progress-stepper {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .global-guide-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .global-guide-bar {
+    display: grid;
+  }
+
+  .ui-info-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .arena-page {
+    padding: 12px;
+  }
+
+  .workspace-shell,
+  .ui-panel,
+  .preview-drawer {
+    padding: 14px;
+  }
+
+  .history-list li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ui-progress-stepper {
+    grid-template-columns: 1fr;
+  }
+
+  .bottom-nav {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    padding: 6px;
+    gap: 3px;
+  }
+
+  .bottom-link {
+    min-height: 52px;
+    font-size: 0.63rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}

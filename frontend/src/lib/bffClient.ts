@@ -1,0 +1,273 @@
+import type {
+  ChainTicketEvent,
+  MarketStats,
+  MarketplaceView,
+  SystemState,
+  TicketTimelineEntry,
+  TicketView,
+} from "../types/chainticket";
+
+type ListingSort = "price_asc" | "price_desc" | "recent";
+
+interface BffSystemPayload {
+  primaryPriceWei: string;
+  maxSupply: string;
+  totalMinted: string;
+  maxPerWallet: string;
+  paused: boolean;
+  collectibleMode: boolean;
+}
+
+interface BffListingPayload {
+  tokenId: string;
+  seller: string;
+  priceWei: string;
+  isActive: boolean;
+}
+
+interface BffMarketStatsPayload {
+  listingCount: number;
+  floorPriceWei: string | null;
+  medianPriceWei: string | null;
+  maxPriceWei: string | null;
+  averagePriceWei: string | null;
+  suggestedListPriceWei: string | null;
+}
+
+interface BffTicketPayload {
+  tokenId: string;
+  owner: string;
+  used: boolean;
+  tokenURI: string;
+  listed: boolean;
+  listingPriceWei: string | null;
+}
+
+interface BffTimelineEntryPayload {
+  id: string;
+  tokenId: string;
+  kind: TicketTimelineEntry["kind"];
+  blockNumber: number;
+  txHash: string;
+  timestamp: number | null;
+  description: string;
+  from?: string;
+  to?: string;
+  seller?: string;
+  buyer?: string;
+  scanner?: string;
+  priceWei?: string;
+  feeAmountWei?: string;
+}
+
+function toBigInt(value: string | null | undefined): bigint | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return BigInt(value);
+}
+
+function parseSystem(payload: BffSystemPayload): SystemState {
+  return {
+    primaryPrice: BigInt(payload.primaryPriceWei),
+    maxSupply: BigInt(payload.maxSupply),
+    totalMinted: BigInt(payload.totalMinted),
+    maxPerWallet: BigInt(payload.maxPerWallet),
+    paused: payload.paused,
+    collectibleMode: payload.collectibleMode,
+  };
+}
+
+function parseListings(payload: BffListingPayload[]): MarketplaceView[] {
+  return payload.map((item) => ({
+    tokenId: BigInt(item.tokenId),
+    seller: item.seller,
+    price: BigInt(item.priceWei),
+    isActive: item.isActive,
+  }));
+}
+
+function parseStats(payload: BffMarketStatsPayload): MarketStats {
+  return {
+    listingCount: payload.listingCount,
+    floorPrice: toBigInt(payload.floorPriceWei),
+    medianPrice: toBigInt(payload.medianPriceWei),
+    maxPrice: toBigInt(payload.maxPriceWei),
+    averagePrice: toBigInt(payload.averagePriceWei),
+    suggestedListPrice: toBigInt(payload.suggestedListPriceWei),
+  };
+}
+
+function parseTickets(payload: BffTicketPayload[]): TicketView[] {
+  return payload.map((item) => ({
+    tokenId: BigInt(item.tokenId),
+    owner: item.owner,
+    used: item.used,
+    tokenURI: item.tokenURI,
+    listed: item.listed,
+    listingPrice: toBigInt(item.listingPriceWei),
+  }));
+}
+
+function parseTimeline(payload: BffTimelineEntryPayload[]): TicketTimelineEntry[] {
+  return payload.map((item) => ({
+    id: item.id,
+    tokenId: BigInt(item.tokenId),
+    kind: item.kind,
+    blockNumber: item.blockNumber,
+    txHash: item.txHash,
+    timestamp: item.timestamp,
+    description: item.description,
+    from: item.from,
+    to: item.to,
+    seller: item.seller,
+    buyer: item.buyer,
+    scanner: item.scanner,
+    price: toBigInt(item.priceWei) ?? undefined,
+    feeAmount: toBigInt(item.feeAmountWei) ?? undefined,
+  }));
+}
+
+function parseStreamEvent(payload: unknown): ChainTicketEvent | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const value = payload as {
+    type?: ChainTicketEvent["type"];
+    tokenId?: string;
+    txHash?: string;
+    blockNumber?: number;
+  };
+
+  if (!value.type) {
+    return null;
+  }
+
+  return {
+    type: value.type,
+    tokenId: value.tokenId ? BigInt(value.tokenId) : undefined,
+    txHash: value.txHash,
+    blockNumber: value.blockNumber,
+  };
+}
+
+export class BffClient {
+  private readonly baseUrl: string;
+
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl;
+  }
+
+  private async fetchJson<T>(path: string, timeoutMs = 6500): Promise<T> {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
+
+    try {
+      const response = await fetch(`${this.baseUrl}${path}`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`BFF request failed (${response.status}) on ${path}`);
+      }
+
+      return (await response.json()) as T;
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  }
+
+  async health(): Promise<{ ok: boolean; indexedBlock?: number }> {
+    return this.fetchJson<{ ok: boolean; indexedBlock?: number }>("/v1/health");
+  }
+
+  async getSystemState(): Promise<SystemState> {
+    const payload = await this.fetchJson<BffSystemPayload>("/v1/system");
+    return parseSystem(payload);
+  }
+
+  async getListings(options: {
+    sort?: ListingSort;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<MarketplaceView[]> {
+    const query = new URLSearchParams();
+    if (options.sort) {
+      query.set("sort", options.sort);
+    }
+    if (options.limit !== undefined) {
+      query.set("limit", String(options.limit));
+    }
+    if (options.offset !== undefined) {
+      query.set("offset", String(options.offset));
+    }
+
+    const suffix = query.size ? `?${query.toString()}` : "";
+    const payload = await this.fetchJson<{ items: BffListingPayload[] }>(`/v1/listings${suffix}`);
+    return parseListings(payload.items);
+  }
+
+  async getMarketStats(): Promise<MarketStats> {
+    const payload = await this.fetchJson<BffMarketStatsPayload>("/v1/market/stats");
+    return parseStats(payload);
+  }
+
+  async getUserTickets(address: string): Promise<TicketView[]> {
+    const payload = await this.fetchJson<{ items: BffTicketPayload[] }>(
+      `/v1/users/${address}/tickets`,
+    );
+    return parseTickets(payload.items);
+  }
+
+  async getTicketTimeline(tokenId: bigint): Promise<TicketTimelineEntry[]> {
+    const payload = await this.fetchJson<{ items: BffTimelineEntryPayload[] }>(
+      `/v1/tickets/${tokenId.toString()}/timeline`,
+    );
+    return parseTimeline(payload.items);
+  }
+
+  watchEvents(
+    onEvent: (event: ChainTicketEvent) => void,
+    onError?: (error: unknown) => void,
+  ): () => void {
+    const stream = new EventSource(`${this.baseUrl}/v1/events/stream`);
+
+    const messageHandler = (message: MessageEvent<string>) => {
+      try {
+        const parsed = parseStreamEvent(JSON.parse(message.data));
+        if (parsed) {
+          onEvent(parsed);
+        }
+      } catch (error) {
+        onError?.(error);
+      }
+    };
+
+    const errorHandler = (error: unknown) => {
+      onError?.(error);
+    };
+
+    stream.addEventListener("message", messageHandler as EventListener);
+    stream.addEventListener("error", errorHandler as EventListener);
+
+    return () => {
+      stream.removeEventListener("message", messageHandler as EventListener);
+      stream.removeEventListener("error", errorHandler as EventListener);
+      stream.close();
+    };
+  }
+}
+
+export function createBffClient(baseUrl: string | null): BffClient | null {
+  if (!baseUrl) {
+    return null;
+  }
+  return new BffClient(baseUrl);
+}

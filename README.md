@@ -40,6 +40,8 @@ Useful scripts:
 - `npm run demo:amoy`
 - `npm run demo:local`
 
+Deployment supports an optional governance handoff to a multisig or timelock via the variables in `.env.example`.
+
 ### 2) Frontend (React + Vite)
 
 ```bash
@@ -73,6 +75,7 @@ npm run dev
 The BFF indexes on-chain events block-by-block and serves versioned read APIs:
 
 - `GET /v1/health`
+- `GET /v1/metrics`
 - `GET /v1/system`
 - `GET /v1/listings?sort=price_asc|price_desc|recent&limit=&offset=`
 - `GET /v1/market/stats`
@@ -86,6 +89,7 @@ Rate-limit protection is built in:
 - exponential backoff with jitter
 - optional hard stop after repeated rate-limit failures (`INDEXER_STOP_ON_MAX_RATE_LIMIT`)
 - indexer runtime status visible in `GET /v1/health`
+- Prometheus-style operational metrics visible in `GET /v1/metrics`
 
 ## Docker (recommended local stack)
 

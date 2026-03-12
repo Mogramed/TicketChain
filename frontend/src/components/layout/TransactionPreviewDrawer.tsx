@@ -44,11 +44,16 @@ export function TransactionPreviewDrawer() {
   })();
 
   const blockers = pendingPreview.preflight?.blockers ?? [];
+  const warnings = pendingPreview.preflight?.warnings ?? [];
   const precheckTone = !pendingPreview.preflight
     ? "warning"
     : pendingPreview.preflight.ok
       ? "success"
       : "error";
+  const canConfirm = pendingPreview.preflight ? pendingPreview.preflight.ok : true;
+  const needsApprovalGuidance =
+    pendingPreview.action?.type === "list" &&
+    blockers.some((blocker) => blocker.includes("Marketplace approval missing"));
 
   return (
     <div
@@ -95,6 +100,25 @@ export function TransactionPreviewDrawer() {
           ]}
         />
 
+        {warnings.length > 0 ? (
+          <InfoList
+            entries={warnings.map((warning, index) => ({
+              label: `Warning ${index + 1}`,
+              value: warning,
+            }))}
+          />
+        ) : null}
+
+        {needsApprovalGuidance ? (
+          <RiskBanner
+            tone="warning"
+            title="Approval needed first"
+            cause="This ticket has not been approved for the marketplace yet."
+            impact="Listing cannot be signed until the approval transaction is confirmed."
+            action="Close this drawer, run the approval step, then reopen the listing preview."
+          />
+        ) : null}
+
         <ul>
           {pendingPreview.details.map((detail) => (
             <li key={detail}>{detail}</li>
@@ -112,8 +136,9 @@ export function TransactionPreviewDrawer() {
             type="button"
             className="primary"
             onClick={() => void confirmPendingPreview()}
+            disabled={!canConfirm}
           >
-            {t("confirmAndSign")}
+            {canConfirm ? t("confirmAndSign") : "Resolve blockers first"}
           </button>
         </ButtonGroup>
       </Panel>

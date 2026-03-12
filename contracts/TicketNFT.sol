@@ -2,13 +2,15 @@
 pragma solidity ^0.8.28;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
+import {IERC4906} from "@openzeppelin/contracts/interfaces/IERC4906.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {ICheckInRegistry} from "./interfaces/ICheckInRegistry.sol";
 
-contract TicketNFT is ERC721, AccessControl, Pausable {
+contract TicketNFT is ERC721, AccessControl, Pausable, IERC4906 {
     using Strings for uint256;
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -90,6 +92,7 @@ contract TicketNFT is ERC721, AccessControl, Pausable {
     function setCollectibleMode(bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
         collectibleMode = enabled;
         emit CollectibleModeUpdated(enabled);
+        _emitBatchMetadataUpdate();
     }
 
     function setBaseUris(
@@ -99,6 +102,7 @@ contract TicketNFT is ERC721, AccessControl, Pausable {
         _baseTokenURI = baseTokenURI_;
         _collectibleBaseURI = collectibleBaseURI_;
         emit BaseUrisUpdated(baseTokenURI_, collectibleBaseURI_);
+        _emitBatchMetadataUpdate();
     }
 
     function pause() external onlyRole(PAUSER_ROLE) {
@@ -131,8 +135,8 @@ contract TicketNFT is ERC721, AccessControl, Pausable {
 
     function supportsInterface(
         bytes4 interfaceId
-    ) public view override(ERC721, AccessControl) returns (bool) {
-        return super.supportsInterface(interfaceId);
+    ) public view override(ERC721, AccessControl, IERC165) returns (bool) {
+        return interfaceId == type(IERC4906).interfaceId || super.supportsInterface(interfaceId);
     }
 
     function _update(
@@ -159,5 +163,13 @@ contract TicketNFT is ERC721, AccessControl, Pausable {
         }
 
         return checkInRegistry.isUsed(tokenId);
+    }
+
+    function _emitBatchMetadataUpdate() private {
+        if (_nextTokenId == 0) {
+            return;
+        }
+
+        emit BatchMetadataUpdate(0, _nextTokenId - 1);
     }
 }

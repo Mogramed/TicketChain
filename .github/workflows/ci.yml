@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - "codex/**"
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+            bff/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Install BFF dependencies
+        run: npm ci --prefix bff
+
+      - name: Run smart contract tests
+        run: npm test
+
+      - name: Run frontend CI checks
+        run: npm run frontend:ci
+
+      - name: Run BFF tests
+        run: npm run bff:test
+
+      - name: Run BFF build
+        run: npm run bff:build

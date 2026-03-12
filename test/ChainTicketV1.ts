@@ -271,10 +271,30 @@ describe("ChainTicket V1", function () {
 
       expect(await ticket.tokenURI(0n)).to.equal("ipfs://ticket/base/0.json");
 
-      await (await ticket.setCollectibleMode(true)).wait();
+      await expect(ticket.setCollectibleMode(true))
+        .to.emit(ticket, "CollectibleModeUpdated")
+        .withArgs(true)
+        .and.to.emit(ticket, "BatchMetadataUpdate")
+        .withArgs(0n, 0n);
       expect(await ticket.tokenURI(0n)).to.equal(
         "ipfs://ticket/collectible/0.json",
       );
+    });
+
+    it("emits metadata refresh signals when base URIs change", async function () {
+      const { seller, ticket, primaryPrice } = await deploySystem();
+
+      await (await ticket.connect(seller).mintPrimary({ value: primaryPrice })).wait();
+
+      await expect(
+        ticket.setBaseUris("ipfs://ticket/new-base/", "ipfs://ticket/new-collectible/"),
+      )
+        .to.emit(ticket, "BaseUrisUpdated")
+        .withArgs("ipfs://ticket/new-base/", "ipfs://ticket/new-collectible/")
+        .and.to.emit(ticket, "BatchMetadataUpdate")
+        .withArgs(0n, 0n);
+
+      expect(await ticket.tokenURI(0n)).to.equal("ipfs://ticket/new-base/0.json");
     });
   });
 });

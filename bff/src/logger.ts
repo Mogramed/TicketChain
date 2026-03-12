@@ -4,6 +4,7 @@ import pino from "pino";
 import type { NextFunction, Request, Response } from "express";
 
 import { config } from "./config.js";
+import { metrics } from "./metrics.js";
 
 export const logger = pino({
   level: config.nodeEnv === "development" ? "debug" : "info",
@@ -21,13 +22,26 @@ export function requestLogger(request: Request, response: Response, next: NextFu
   response.setHeader("x-request-id", requestId);
 
   response.on("finish", () => {
+    const durationMs = Date.now() - startedAt;
+    const routePath =
+      typeof request.route?.path === "string"
+        ? `${request.baseUrl ?? ""}${request.route.path}`
+        : request.path;
+
+    metrics.recordHttpRequest({
+      method: request.method,
+      path: routePath,
+      statusCode: response.statusCode,
+      durationMs,
+    });
+
     logger.info(
       {
         requestId,
         method: request.method,
         path: request.originalUrl,
         statusCode: response.statusCode,
-        durationMs: Date.now() - startedAt,
+        durationMs,
         userAgent: request.header("user-agent") ?? "",
       },
       "HTTP request",

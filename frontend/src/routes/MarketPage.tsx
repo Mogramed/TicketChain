@@ -36,6 +36,7 @@ export function MarketPage() {
     marketStats,
     walletAddress,
     systemState,
+    tickets,
     preparePreview,
     setErrorMessage,
     watchlist,
@@ -50,6 +51,15 @@ export function MarketPage() {
   const [viewMode, setViewMode] = useState<MarketViewMode>("card");
   const [filterMode, setFilterMode] = useState<MarketFilterMode>("all");
   const [sortMode, setSortMode] = useState<MarketSortMode>("price_asc");
+
+  const selectedToken = useMemo(() => parseTokenIdInput(selectedTokenId), [selectedTokenId]);
+  const selectedOwnedTicket = useMemo(
+    () =>
+      selectedToken === null
+        ? null
+        : tickets.find((ticket) => ticket.tokenId === selectedToken) ?? null,
+    [selectedToken, tickets],
+  );
 
   const filteredListings = useMemo(() => {
     const normalizedSearch = searchInput.trim().toLowerCase();
@@ -95,6 +105,12 @@ export function MarketPage() {
     }
     return pendingPreview.preflight;
   }, [pendingPreview]);
+
+  const listingNeedsApproval =
+    pendingPreview?.action?.type === "list" &&
+    Boolean(
+      marketPreflight?.blockers.some((blocker) => blocker.includes("Marketplace approval missing")),
+    );
 
   const onApproveSelected = async () => {
     const tokenId = parseTokenIdInput(selectedTokenId);
@@ -237,7 +253,7 @@ export function MarketPage() {
 
         <Card className="market-listing-card">
           <h3>Create or update a listing</h3>
-          <p>Choose a ticket, set a compliant price, then sign the action you need.</p>
+          <p>Choose a ticket, approve it once for the marketplace, then sign the compliant listing.</p>
           <section className="market-form">
             <label>
               {t("tokenId")}
@@ -258,12 +274,43 @@ export function MarketPage() {
             </label>
           </section>
 
+          <InfoList
+            entries={[
+              {
+                label: "Selected ticket",
+                value:
+                  selectedOwnedTicket === null
+                    ? selectedToken === null
+                      ? "Choose one of your tickets to start."
+                      : "Ticket not found in your wallet view."
+                    : `#${selectedOwnedTicket.tokenId.toString()}`,
+              },
+              {
+                label: "Ticket state",
+                value:
+                  selectedOwnedTicket === null
+                    ? "-"
+                    : selectedOwnedTicket.used
+                      ? "Already used"
+                      : selectedOwnedTicket.listed
+                        ? "Already listed"
+                        : "Ready for approval or listing",
+              },
+              {
+                label: "Recommended next step",
+                value: listingNeedsApproval
+                  ? "Run approval first, then reopen the listing preview."
+                  : "Approve once if this ticket has never been listed from this wallet.",
+              },
+            ]}
+          />
+
           <ButtonGroup>
             <button type="button" className="ghost" onClick={() => void onApproveSelected()}>
-              {t("approveTicket")}
+              1. {t("approveTicket")}
             </button>
             <button type="button" className="primary" onClick={() => void onListSelected()}>
-              {t("createListing")}
+              2. {t("createListing")}
             </button>
             <button type="button" className="ghost" onClick={() => void onCancelSelected()}>
               {t("cancelListing")}
@@ -332,6 +379,16 @@ export function MarketPage() {
           cause={t("emptyWalletMarketCause")}
           impact={t("emptyWalletMarketImpact")}
           action={t("emptyWalletMarketAction")}
+        />
+      ) : null}
+
+      {listingNeedsApproval ? (
+        <RiskBanner
+          tone="warning"
+          title="Approval is still missing"
+          cause="The marketplace is not approved for the selected ticket."
+          impact="Your listing cannot be submitted until the approval transaction confirms."
+          action="Use the approve action first, wait for confirmation, then retry the listing."
         />
       ) : null}
 

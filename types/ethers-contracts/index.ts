@@ -3,10 +3,12 @@
 /* eslint-disable */
 import type * as interfaces from './interfaces/index.js';
 export type { interfaces };
+export type { ChainTicketTimelock } from './ChainTicketTimelock.js';
 export type { CheckInRegistry } from './CheckInRegistry.js';
 export type { Marketplace } from './Marketplace.js';
 export type { TicketNFT } from './TicketNFT.js';
 export * as factories from './factories/index.js';
+export { ChainTicketTimelock__factory } from './factories/ChainTicketTimelock__factory.js';
 export { CheckInRegistry__factory } from './factories/CheckInRegistry__factory.js';
 export type { ICheckInRegistry } from './interfaces/ICheckInRegistry.js';
 export { ICheckInRegistry__factory } from './factories/interfaces/ICheckInRegistry__factory.js';

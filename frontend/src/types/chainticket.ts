@@ -119,6 +119,7 @@ export interface MarketStats {
 
 export interface UserRoles {
   isAdmin: boolean;
+  isScannerAdmin: boolean;
   isPauser: boolean;
   isScanner: boolean;
 }
@@ -179,6 +180,8 @@ export interface ChainTicketClient {
   buyTicket: (tokenId: bigint, price: bigint) => Promise<TxResponseLike>;
   getUserRoles?: (address: string) => Promise<UserRoles>;
   markTicketUsed?: (tokenId: bigint) => Promise<TxResponseLike>;
+  grantScannerRole?: (account: string) => Promise<TxResponseLike>;
+  revokeScannerRole?: (account: string) => Promise<TxResponseLike>;
   pauseSystem?: () => Promise<TxResponseLike>;
   unpauseSystem?: () => Promise<TxResponseLike>;
   setCollectibleMode?: (enabled: boolean) => Promise<TxResponseLike>;

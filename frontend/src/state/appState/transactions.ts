@@ -139,14 +139,14 @@ export function useTransactionState({
       if (payload.action) {
         try {
           preflight = await walletClient.preflightAction(payload.action);
-          if (!preflight.ok) {
-            setErrorMessage(preflight.blockers.join(" | "));
-            return;
-          }
         } catch (error) {
           setErrorMessage(mapEthersError(error));
           return;
         }
+      }
+
+      if (preflight && !preflight.ok) {
+        setErrorMessage(preflight.blockers.join(" | "));
       }
 
       setPendingPreviewState({

@@ -6,6 +6,7 @@ import {
   ButtonGroup,
   Card,
   DetailAccordion,
+  InfoList,
   PageHeader,
   Panel,
   RiskBanner,
@@ -40,16 +41,21 @@ function extractTokenId(rawValue: string): string | null {
 
 export function ScannerPage() {
   const { t } = useI18n();
-  const { userRoles, preparePreview, setErrorMessage, uiMode } = useAppState();
+  const { userRoles, preparePreview, setErrorMessage, txState, uiMode } = useAppState();
 
   const [tokenInput, setTokenInput] = useState("");
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [lastDetectedValue, setLastDetectedValue] = useState("");
+  const [scannerNotice, setScannerNotice] = useState("Ready for the next attendee.");
+  const [sessionCheckIns, setSessionCheckIns] = useState<string[]>([]);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const detectorRef = useRef<BarcodeDetector | null>(null);
   const scanIntervalRef = useRef<number | null>(null);
+  const lastSubmittedTokenRef = useRef<string>("");
+  const sessionCheckInsRef = useRef<string[]>([]);
 
   const stopCamera = () => {
     if (scanIntervalRef.current !== null) {
@@ -74,11 +80,13 @@ export function ScannerPage() {
   const startCamera = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError("Camera API not available in this browser.");
+      setScannerNotice("Manual fallback active: camera APIs are unavailable on this device.");
       return;
     }
 
     if (typeof BarcodeDetector === "undefined") {
       setCameraError("BarcodeDetector API is not available. Use manual token entry.");
+      setScannerNotice("Manual fallback active: QR detection is not supported in this browser.");
       return;
     }
 
@@ -121,6 +129,12 @@ export function ScannerPage() {
           const tokenId = extractTokenId(candidate);
           if (tokenId) {
             setTokenInput(tokenId);
+            setLastDetectedValue(candidate);
+            setScannerNotice(
+              sessionCheckInsRef.current.includes(tokenId)
+                ? `Ticket #${tokenId} was already checked in during this session.`
+                : `Ticket #${tokenId} detected. Review and confirm the check-in.`,
+            );
           }
         } catch {
           // Ignore transient frame detection errors.
@@ -130,6 +144,7 @@ export function ScannerPage() {
       setCameraEnabled(true);
     } catch (error) {
       setCameraError(error instanceof Error ? error.message : "Camera initialization failed.");
+      setScannerNotice("Manual fallback active: camera initialization failed.");
     }
   };
 
@@ -139,12 +154,49 @@ export function ScannerPage() {
     };
   }, []);
 
+  useEffect(() => {
+    sessionCheckInsRef.current = sessionCheckIns;
+  }, [sessionCheckIns]);
+
+  useEffect(() => {
+    if (txState.label !== "Scanner check-in") {
+      return;
+    }
+
+    if (txState.status === "success" && lastSubmittedTokenRef.current) {
+      const tokenId = lastSubmittedTokenRef.current;
+      setSessionCheckIns((current) =>
+        current.includes(tokenId) ? current : [tokenId, ...current].slice(0, 8),
+      );
+      setScannerNotice(`Ticket #${tokenId} successfully checked in.`);
+    }
+
+    if (txState.status === "error") {
+      const isDuplicate = (txState.errorReason ?? "").toLowerCase().includes("already used");
+      setScannerNotice(
+        isDuplicate
+          ? `Duplicate check-in blocked for ticket #${lastSubmittedTokenRef.current || "?"}.`
+          : txState.errorReason ?? "Check-in failed. Review the token and retry.",
+      );
+    }
+  }, [txState]);
+
   const onMarkUsed = async () => {
     const tokenId = parseTokenIdInput(tokenInput);
     if (tokenId === null) {
       setErrorMessage("Enter a valid tokenId.");
       return;
     }
+
+    if (sessionCheckIns.includes(tokenId.toString())) {
+      const message = `Ticket #${tokenId.toString()} was already checked in during this session.`;
+      setScannerNotice(message);
+      setErrorMessage(message);
+      return;
+    }
+
+    lastSubmittedTokenRef.current = tokenId.toString();
+    setScannerNotice(`Previewing on-chain check-in for ticket #${tokenId.toString()}.`);
 
     await preparePreview({
       label: "Scanner check-in",
@@ -230,6 +282,17 @@ export function ScannerPage() {
               )}
               <button
                 type="button"
+                className="ghost"
+                onClick={() => {
+                  setTokenInput("");
+                  setLastDetectedValue("");
+                  setScannerNotice("Input cleared. Ready for the next attendee.");
+                }}
+              >
+                Clear token
+              </button>
+              <button
+                type="button"
                 className="primary"
                 onClick={() => void onMarkUsed()}
                 disabled={!userRoles.isScanner}
@@ -239,13 +302,39 @@ export function ScannerPage() {
             </ButtonGroup>
 
             <Card className="scanner-status-card">
-              <p>
-                Camera: <strong>{cameraEnabled ? "Live feed active" : "Not streaming"}</strong>
-              </p>
-              <p>
-                Target token: <strong>{tokenInput || "Not set"}</strong>
-              </p>
+              <InfoList
+                entries={[
+                  {
+                    label: "Camera",
+                    value: cameraEnabled ? "Live feed active" : "Manual / standby",
+                  },
+                  {
+                    label: "Target token",
+                    value: tokenInput || "Not set",
+                  },
+                  {
+                    label: "Last detected payload",
+                    value: lastDetectedValue || "No QR payload captured yet",
+                  },
+                  {
+                    label: "Scanner notice",
+                    value: scannerNotice,
+                  },
+                  {
+                    label: "Last tx status",
+                    value: txState.label === "Scanner check-in" ? txState.status : "idle",
+                  },
+                ]}
+              />
             </Card>
+
+            {sessionCheckIns.length > 0 ? (
+              <Card className="scanner-status-card">
+                <p>
+                  Session check-ins: <strong>{sessionCheckIns.join(", ")}</strong>
+                </p>
+              </Card>
+            ) : null}
           </Panel>
 
           <Panel className="scanner-screen">

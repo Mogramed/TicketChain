@@ -8,6 +8,7 @@ import { config } from "./config.js";
 import {
   getChainStateNumber,
   getChainStateString,
+  pool,
   resetIndexedState,
   setChainStateNumber,
   setChainStateString,
@@ -116,12 +117,22 @@ function randomJitter(maxMs: number): number {
   return Math.floor(Math.random() * Math.max(0, maxMs));
 }
 
-interface IndexerStatus {
+interface MetadataRefreshTrigger {
+  blockNumber: number;
+  logIndex: number;
+  txHash: string;
+  reason: "collectible_mode" | "base_uris";
+}
+
+export interface IndexerStatus {
   running: boolean;
   haltedByRateLimit: boolean;
   haltedReason: string | null;
   currentBatchSize: number;
   consecutiveRateLimitErrors: number;
+  totalRateLimitErrors: number;
+  totalEventsProcessed: number;
+  totalMetadataRefreshes: number;
 }
 
 interface CachedSystemState {
@@ -145,6 +156,9 @@ export class ChainIndexer extends EventEmitter {
   private consecutiveRateLimitErrors = 0;
   private haltedByRateLimit = false;
   private haltedReason: string | null = null;
+  private totalRateLimitErrors = 0;
+  private totalEventsProcessed = 0;
+  private totalMetadataRefreshes = 0;
   private cachedSystemState: CachedSystemState | null = null;
   private cachedSystemStateAt = 0;
 
@@ -205,6 +219,9 @@ export class ChainIndexer extends EventEmitter {
       haltedReason: this.haltedReason,
       currentBatchSize: this.currentBatchSize,
       consecutiveRateLimitErrors: this.consecutiveRateLimitErrors,
+      totalRateLimitErrors: this.totalRateLimitErrors,
+      totalEventsProcessed: this.totalEventsProcessed,
+      totalMetadataRefreshes: this.totalMetadataRefreshes,
     };
   }
 
@@ -289,6 +306,7 @@ export class ChainIndexer extends EventEmitter {
       } catch (error) {
         if (isRateLimitError(error)) {
           this.consecutiveRateLimitErrors += 1;
+          this.totalRateLimitErrors += 1;
           this.currentBatchSize = Math.max(
             config.indexerMinBatchSize,
             Math.floor(this.currentBatchSize / 2),
@@ -380,12 +398,21 @@ export class ChainIndexer extends EventEmitter {
   private async processRange(fromBlock: number, toBlock: number): Promise<void> {
     const events = await this.collectEvents(fromBlock, toBlock);
     const tokenUriMap = await this.loadTokenUris(events);
+    const metadataRefreshes = await this.collectMetadataRefreshes(fromBlock, toBlock);
+    const metadataTokenUriMap =
+      metadataRefreshes.length > 0
+        ? await this.loadStoredTokenUris()
+        : new Map<string, string>();
     const endBlock = await this.provider.getBlock(toBlock);
 
     await withTransaction(async (client) => {
       for (const event of events) {
         await this.insertEvent(client, event);
         await this.applyEvent(client, event, tokenUriMap);
+      }
+
+      if (metadataTokenUriMap.size > 0) {
+        await this.applyTokenUriRefreshes(client, metadataTokenUriMap);
       }
 
       if (endBlock) {
@@ -406,6 +433,9 @@ export class ChainIndexer extends EventEmitter {
       await setChainStateString(client, "last_indexed_hash", endBlock?.hash ?? ZERO_ADDRESS);
     });
 
+    this.totalEventsProcessed += events.length;
+    this.totalMetadataRefreshes += metadataRefreshes.length;
+
     for (const event of events) {
       const payload: ChainEventPayload = {
         type: event.type,
@@ -417,7 +447,12 @@ export class ChainIndexer extends EventEmitter {
     }
 
     logger.info(
-      { fromBlock, toBlock, eventCount: events.length },
+      {
+        fromBlock,
+        toBlock,
+        eventCount: events.length,
+        metadataRefreshCount: metadataRefreshes.length,
+      },
       "Indexer processed block range.",
     );
   }
@@ -552,6 +587,51 @@ export class ChainIndexer extends EventEmitter {
     return sorted;
   }
 
+  private async collectMetadataRefreshes(
+    fromBlock: number,
+    toBlock: number,
+  ): Promise<MetadataRefreshTrigger[]> {
+    const [collectibleLogs, baseUriLogs] = await Promise.all([
+      this.ticketContract.queryFilter(
+        this.ticketContract.filters.CollectibleModeUpdated(),
+        fromBlock,
+        toBlock,
+      ),
+      this.ticketContract.queryFilter(
+        this.ticketContract.filters.BaseUrisUpdated(),
+        fromBlock,
+        toBlock,
+      ),
+    ]);
+
+    const refreshes: MetadataRefreshTrigger[] = [];
+
+    for (const log of collectibleLogs) {
+      refreshes.push({
+        blockNumber: getBlockNumber(log),
+        logIndex: getLogIndex(log),
+        txHash: getTxHash(log),
+        reason: "collectible_mode",
+      });
+    }
+
+    for (const log of baseUriLogs) {
+      refreshes.push({
+        blockNumber: getBlockNumber(log),
+        logIndex: getLogIndex(log),
+        txHash: getTxHash(log),
+        reason: "base_uris",
+      });
+    }
+
+    return refreshes.sort((left, right) => {
+      if (left.blockNumber !== right.blockNumber) {
+        return left.blockNumber - right.blockNumber;
+      }
+      return left.logIndex - right.logIndex;
+    });
+  }
+
   private async loadTokenUris(events: IndexedEvent[]): Promise<Map<string, string>> {
     const tokenIds = Array.from(
       new Set(
@@ -560,7 +640,19 @@ export class ChainIndexer extends EventEmitter {
           .map((event) => event.tokenId.toString()),
       ),
     );
+    return this.loadTokenUrisForIds(tokenIds);
+  }
 
+  private async loadStoredTokenUris(): Promise<Map<string, string>> {
+    const result = await pool.query<{ token_id: string }>(
+      "SELECT token_id FROM ticket_state ORDER BY token_id::numeric ASC",
+    );
+    const tokenIds = result.rows.map((row) => row.token_id);
+
+    return this.loadTokenUrisForIds(tokenIds);
+  }
+
+  private async loadTokenUrisForIds(tokenIds: string[]): Promise<Map<string, string>> {
     const map = new Map<string, string>();
     await Promise.all(
       tokenIds.map(async (tokenId) => {
@@ -573,6 +665,30 @@ export class ChainIndexer extends EventEmitter {
       }),
     );
     return map;
+  }
+
+  private async applyTokenUriRefreshes(
+    client: PoolClient,
+    tokenUriMap: Map<string, string>,
+  ): Promise<void> {
+    if (tokenUriMap.size === 0) {
+      return;
+    }
+
+    for (const [tokenId, tokenUri] of tokenUriMap.entries()) {
+      if (!tokenUri) {
+        continue;
+      }
+
+      await client.query(
+        `
+          UPDATE ticket_state
+          SET token_uri = $2
+          WHERE token_id = $1
+        `,
+        [tokenId, tokenUri],
+      );
+    }
   }
 
   private async insertEvent(client: PoolClient, event: IndexedEvent): Promise<void> {
@@ -757,28 +873,53 @@ export class ChainIndexer extends EventEmitter {
 
     if (event.type === "used") {
       const tokenId = event.tokenId.toString();
-      await client.query(
+      const updated = await client.query(
         `
-          INSERT INTO ticket_state (
-            token_id,
-            owner,
-            used,
-            token_uri,
-            listed,
-            listing_price_wei,
-            updated_block,
-            updated_tx_hash
-          )
-          VALUES ($1, $2, TRUE, '', FALSE, NULL, $3, $4)
-          ON CONFLICT (token_id) DO UPDATE
+          UPDATE ticket_state
           SET used = TRUE,
               listed = FALSE,
               listing_price_wei = NULL,
-              updated_block = EXCLUDED.updated_block,
-              updated_tx_hash = EXCLUDED.updated_tx_hash
+              updated_block = $2,
+              updated_tx_hash = $3
+          WHERE token_id = $1
         `,
-        [tokenId, ZERO_ADDRESS, event.blockNumber, event.txHash],
+        [tokenId, event.blockNumber, event.txHash],
       );
+
+      if (updated.rowCount === 0) {
+        const [owner, tokenUri] = await Promise.all([
+          this.ticketContract.ownerOf(event.tokenId),
+          this.ticketContract.tokenURI(event.tokenId).catch(() => ""),
+        ]);
+
+        await client.query(
+          `
+            INSERT INTO ticket_state (
+              token_id,
+              owner,
+              used,
+              token_uri,
+              listed,
+              listing_price_wei,
+              updated_block,
+              updated_tx_hash
+            )
+            VALUES ($1, $2, TRUE, $3, FALSE, NULL, $4, $5)
+            ON CONFLICT (token_id) DO UPDATE
+            SET owner = COALESCE(NULLIF(ticket_state.owner, ''), EXCLUDED.owner),
+                used = TRUE,
+                listed = FALSE,
+                listing_price_wei = NULL,
+                token_uri = CASE
+                  WHEN EXCLUDED.token_uri = '' THEN ticket_state.token_uri
+                  ELSE EXCLUDED.token_uri
+                END,
+                updated_block = EXCLUDED.updated_block,
+                updated_tx_hash = EXCLUDED.updated_tx_hash
+          `,
+          [tokenId, normalizeAddress(String(owner)), String(tokenUri), event.blockNumber, event.txHash],
+        );
+      }
       return;
     }
   }

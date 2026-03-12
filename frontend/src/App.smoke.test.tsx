@@ -107,10 +107,13 @@ function buildReadClient(ticketsUsed = true): ChainTicketClient {
     buyTicket: vi.fn().mockResolvedValue(tx("0xbuy")),
     getUserRoles: vi.fn().mockResolvedValue({
       isAdmin: true,
+      isScannerAdmin: true,
       isPauser: true,
       isScanner: true,
     }),
     markTicketUsed: vi.fn().mockResolvedValue(tx("0xused")),
+    grantScannerRole: vi.fn().mockResolvedValue(tx("0xgrant-scanner")),
+    revokeScannerRole: vi.fn().mockResolvedValue(tx("0xrevoke-scanner")),
     pauseSystem: vi.fn().mockResolvedValue(tx("0xpause")),
     unpauseSystem: vi.fn().mockResolvedValue(tx("0xunpause")),
     setCollectibleMode: vi.fn().mockResolvedValue(tx("0xcollectible")),

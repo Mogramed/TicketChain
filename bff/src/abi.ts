@@ -8,6 +8,7 @@ export const TICKET_NFT_ABI = [
   "function tokenURI(uint256 tokenId) view returns (string)",
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
   "event CollectibleModeUpdated(bool enabled)",
+  "event BaseUrisUpdated(string baseTokenURI, string collectibleBaseURI)",
 ] as const;
 
 export const MARKETPLACE_ABI = [

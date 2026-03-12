@@ -48,8 +48,12 @@ export function AdvancedHubPage() {
           <h3>{t("navOrganizer")}</h3>
           <p>System monitoring and sensitive operations for authorized staff.</p>
           <div className="inline-actions">
-            <Tag tone={userRoles.isAdmin || userRoles.isPauser ? "success" : "warning"}>
-              {userRoles.isAdmin || userRoles.isPauser ? t("accessGranted") : t("accessRestricted")}
+            <Tag
+              tone={userRoles.isAdmin || userRoles.isPauser || userRoles.isScannerAdmin ? "success" : "warning"}
+            >
+              {userRoles.isAdmin || userRoles.isPauser || userRoles.isScannerAdmin
+                ? t("accessGranted")
+                : t("accessRestricted")}
             </Tag>
           </div>
           <ButtonGroup>

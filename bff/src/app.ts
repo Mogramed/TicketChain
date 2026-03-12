@@ -13,7 +13,8 @@ import {
   getTicketsByOwner,
 } from "./repository.js";
 import { addressParamSchema, listingsQuerySchema, tokenIdParamSchema } from "./validators.js";
-import type { ChainIndexer } from "./indexer.js";
+import type { ChainIndexer, IndexerStatus } from "./indexer.js";
+import { metrics } from "./metrics.js";
 import type { ChainEventPayload } from "./types.js";
 
 function normalizeError(error: unknown): string {
@@ -88,6 +89,31 @@ export function createApp(indexer: ChainIndexer) {
   const app = express();
   const allowedOrigins = new Set(config.corsOrigins);
 
+  const getIndexerHealth = async (): Promise<{
+    indexedBlock: number;
+    latestBlock: number | null;
+    rpcHealthy: boolean;
+    indexerStatus: IndexerStatus;
+  }> => {
+    const indexerStatus = indexer.getStatus();
+    const indexedBlock = await getIndexedBlock();
+    let latestBlock: number | null = null;
+    let rpcHealthy = true;
+
+    try {
+      latestBlock = await indexer.getLatestChainBlock();
+    } catch {
+      rpcHealthy = false;
+    }
+
+    return {
+      indexedBlock,
+      latestBlock,
+      rpcHealthy,
+      indexerStatus,
+    };
+  };
+
   app.set("trust proxy", 1);
   app.use(requestLogger);
   app.use(
@@ -122,16 +148,7 @@ export function createApp(indexer: ChainIndexer) {
 
   app.get("/v1/health", async (_request, response, next) => {
     try {
-      const indexerStatus = indexer.getStatus();
-      const indexedBlock = await getIndexedBlock();
-      let latestBlock: number | null = null;
-      let rpcHealthy = true;
-
-      try {
-        latestBlock = await indexer.getLatestChainBlock();
-      } catch {
-        rpcHealthy = false;
-      }
+      const { indexerStatus, indexedBlock, latestBlock, rpcHealthy } = await getIndexerHealth();
 
       response.json({
         ok: rpcHealthy,
@@ -141,6 +158,23 @@ export function createApp(indexer: ChainIndexer) {
         rpcHealthy,
         indexer: indexerStatus,
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/v1/metrics", async (_request, response, next) => {
+    try {
+      const { indexerStatus, indexedBlock, latestBlock, rpcHealthy } = await getIndexerHealth();
+      response.setHeader("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+      response.send(
+        metrics.renderPrometheus({
+          indexedBlock,
+          latestBlock,
+          rpcHealthy,
+          indexer: indexerStatus,
+        }),
+      );
     } catch (error) {
       next(error);
     }
@@ -241,11 +275,14 @@ export function createApp(indexer: ChainIndexer) {
     response.setHeader("Cache-Control", "no-cache");
     response.setHeader("Connection", "keep-alive");
     response.flushHeaders();
+    metrics.incrementSseClients();
 
     const send = (event: ChainEventPayload) => {
+      metrics.recordSseEvent();
       response.write(`data: ${JSON.stringify(event)}\n\n`);
     };
 
+    metrics.recordSseEvent();
     response.write(`data: ${JSON.stringify({ type: "hello", ts: Date.now() })}\n\n`);
     indexer.on("event", send);
 
@@ -256,6 +293,7 @@ export function createApp(indexer: ChainIndexer) {
     request.on("close", () => {
       clearInterval(keepAlive);
       indexer.off("event", send);
+      metrics.decrementSseClients();
       response.end();
     });
   });

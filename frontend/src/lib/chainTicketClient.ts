@@ -68,6 +68,7 @@ export function createChainTicketClientFromBindings(
 
     return {
       isAdmin: ticketAdmin || scannerAdmin,
+      isScannerAdmin: scannerAdmin,
       isPauser: ticketPauser,
       isScanner: scanner,
     };
@@ -239,6 +240,20 @@ export function createChainTicketClientFromBindings(
         throw new Error("Check-in write function is unavailable in the current client.");
       }
       return bindings.checkInRegistry.markUsed(tokenId);
+    },
+
+    grantScannerRole: async (account: string) => {
+      if (!bindings.checkInRegistry.grantScanner) {
+        throw new Error("Scanner role grant is unavailable in the current client.");
+      }
+      return bindings.checkInRegistry.grantScanner(account);
+    },
+
+    revokeScannerRole: async (account: string) => {
+      if (!bindings.checkInRegistry.revokeScanner) {
+        throw new Error("Scanner role revoke is unavailable in the current client.");
+      }
+      return bindings.checkInRegistry.revokeScanner(account);
     },
 
     pauseSystem: async () => {

@@ -98,6 +98,7 @@ export interface AppStateContextValue {
 
 export const EMPTY_ROLES: UserRoles = {
   isAdmin: false,
+  isScannerAdmin: false,
   isPauser: false,
   isScanner: false,
 };

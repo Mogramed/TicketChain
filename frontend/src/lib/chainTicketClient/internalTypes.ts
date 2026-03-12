@@ -92,6 +92,8 @@ export interface CheckInBindings {
   hasRole?: (role: string, account: string) => Promise<boolean>;
   isUsed: (tokenId: bigint) => Promise<boolean>;
   markUsed?: (tokenId: bigint) => Promise<TxResponseLike>;
+  grantScanner?: (account: string) => Promise<TxResponseLike>;
+  revokeScanner?: (account: string) => Promise<TxResponseLike>;
   queryUsedEvents?: (tokenId: bigint, fromBlock: number) => Promise<UsedEvent[]>;
 }
 

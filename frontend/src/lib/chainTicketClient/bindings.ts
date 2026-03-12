@@ -390,6 +390,20 @@ export function createEthersBindings(
         const tx = await writable.markUsed(tokenId);
         return toTxResponse(tx);
       },
+      grantScanner: async (account: string) => {
+        const writable = checkInRead.connect(getWriteRunner()) as unknown as {
+          grantScanner: (account: string) => Promise<TransactionResponse>;
+        };
+        const tx = await writable.grantScanner(account);
+        return toTxResponse(tx);
+      },
+      revokeScanner: async (account: string) => {
+        const writable = checkInRead.connect(getWriteRunner()) as unknown as {
+          revokeScanner: (account: string) => Promise<TransactionResponse>;
+        };
+        const tx = await writable.revokeScanner(account);
+        return toTxResponse(tx);
+      },
       queryUsedEvents: async (tokenId: bigint, fromBlock: number) => {
         const logs = await checkInRead.queryFilter(
           checkInRead.filters.TicketMarkedUsed(tokenId),

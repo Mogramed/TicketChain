@@ -8,7 +8,7 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   export interface TicketNFTInterface extends Interface {
     getFunction(nameOrSignature: "DEFAULT_ADMIN_ROLE" | "PAUSER_ROLE" | "approve" | "balanceOf" | "checkInRegistry" | "collectibleMode" | "getApproved" | "getRoleAdmin" | "grantRole" | "hasRole" | "isApprovedForAll" | "isUsed" | "marketplace" | "maxPerWallet" | "maxSupply" | "mintPrimary" | "name" | "ownerOf" | "pause" | "paused" | "primaryPrice" | "renounceRole" | "revokeRole" | "safeTransferFrom(address,address,uint256)" | "safeTransferFrom(address,address,uint256,bytes)" | "setApprovalForAll" | "setBaseUris" | "setCheckInRegistry" | "setCollectibleMode" | "setMarketplace" | "supportsInterface" | "symbol" | "tokenURI" | "totalMinted" | "transferFrom" | "treasury" | "unpause"): FunctionFragment;
 
-    getEvent(nameOrSignatureOrTopic: "Approval" | "ApprovalForAll" | "BaseUrisUpdated" | "CheckInRegistryUpdated" | "CollectibleModeUpdated" | "MarketplaceUpdated" | "Paused" | "PrimaryMinted" | "RoleAdminChanged" | "RoleGranted" | "RoleRevoked" | "Transfer" | "Unpaused"): EventFragment;
+    getEvent(nameOrSignatureOrTopic: "Approval" | "ApprovalForAll" | "BaseUrisUpdated" | "BatchMetadataUpdate" | "CheckInRegistryUpdated" | "CollectibleModeUpdated" | "MarketplaceUpdated" | "MetadataUpdate" | "Paused" | "PrimaryMinted" | "RoleAdminChanged" | "RoleGranted" | "RoleRevoked" | "Transfer" | "Unpaused"): EventFragment;
 
     encodeFunctionData(functionFragment: 'DEFAULT_ADMIN_ROLE', values?: undefined): string;
 encodeFunctionData(functionFragment: 'PAUSER_ROLE', values?: undefined): string;
@@ -124,6 +124,18 @@ decodeFunctionResult(functionFragment: 'unpause', data: BytesLike): Result;
 
   
 
+    export namespace BatchMetadataUpdateEvent {
+      export type InputTuple = [_fromTokenId: BigNumberish, _toTokenId: BigNumberish];
+      export type OutputTuple = [_fromTokenId: bigint, _toTokenId: bigint];
+      export interface OutputObject {_fromTokenId: bigint, _toTokenId: bigint };
+      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
+      export type Filter = TypedDeferredTopicFilter<Event>
+      export type Log = TypedEventLog<Event>
+      export type LogDescription = TypedLogDescription<Event>
+    }
+
+  
+
     export namespace CheckInRegistryUpdatedEvent {
       export type InputTuple = [previousRegistry: AddressLike, newRegistry: AddressLike];
       export type OutputTuple = [previousRegistry: string, newRegistry: string];
@@ -152,6 +164,18 @@ decodeFunctionResult(functionFragment: 'unpause', data: BytesLike): Result;
       export type InputTuple = [previousMarketplace: AddressLike, newMarketplace: AddressLike];
       export type OutputTuple = [previousMarketplace: string, newMarketplace: string];
       export interface OutputObject {previousMarketplace: string, newMarketplace: string };
+      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
+      export type Filter = TypedDeferredTopicFilter<Event>
+      export type Log = TypedEventLog<Event>
+      export type LogDescription = TypedLogDescription<Event>
+    }
+
+  
+
+    export namespace MetadataUpdateEvent {
+      export type InputTuple = [_tokenId: BigNumberish];
+      export type OutputTuple = [_tokenId: bigint];
+      export interface OutputObject {_tokenId: bigint };
       export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
       export type Filter = TypedDeferredTopicFilter<Event>
       export type Log = TypedEventLog<Event>
@@ -765,9 +789,11 @@ getFunction(nameOrSignature: 'unpause'): TypedContractMethod<
     getEvent(key: 'Approval'): TypedContractEvent<ApprovalEvent.InputTuple, ApprovalEvent.OutputTuple, ApprovalEvent.OutputObject>;
 getEvent(key: 'ApprovalForAll'): TypedContractEvent<ApprovalForAllEvent.InputTuple, ApprovalForAllEvent.OutputTuple, ApprovalForAllEvent.OutputObject>;
 getEvent(key: 'BaseUrisUpdated'): TypedContractEvent<BaseUrisUpdatedEvent.InputTuple, BaseUrisUpdatedEvent.OutputTuple, BaseUrisUpdatedEvent.OutputObject>;
+getEvent(key: 'BatchMetadataUpdate'): TypedContractEvent<BatchMetadataUpdateEvent.InputTuple, BatchMetadataUpdateEvent.OutputTuple, BatchMetadataUpdateEvent.OutputObject>;
 getEvent(key: 'CheckInRegistryUpdated'): TypedContractEvent<CheckInRegistryUpdatedEvent.InputTuple, CheckInRegistryUpdatedEvent.OutputTuple, CheckInRegistryUpdatedEvent.OutputObject>;
 getEvent(key: 'CollectibleModeUpdated'): TypedContractEvent<CollectibleModeUpdatedEvent.InputTuple, CollectibleModeUpdatedEvent.OutputTuple, CollectibleModeUpdatedEvent.OutputObject>;
 getEvent(key: 'MarketplaceUpdated'): TypedContractEvent<MarketplaceUpdatedEvent.InputTuple, MarketplaceUpdatedEvent.OutputTuple, MarketplaceUpdatedEvent.OutputObject>;
+getEvent(key: 'MetadataUpdate'): TypedContractEvent<MetadataUpdateEvent.InputTuple, MetadataUpdateEvent.OutputTuple, MetadataUpdateEvent.OutputObject>;
 getEvent(key: 'Paused'): TypedContractEvent<PausedEvent.InputTuple, PausedEvent.OutputTuple, PausedEvent.OutputObject>;
 getEvent(key: 'PrimaryMinted'): TypedContractEvent<PrimaryMintedEvent.InputTuple, PrimaryMintedEvent.OutputTuple, PrimaryMintedEvent.OutputObject>;
 getEvent(key: 'RoleAdminChanged'): TypedContractEvent<RoleAdminChangedEvent.InputTuple, RoleAdminChangedEvent.OutputTuple, RoleAdminChangedEvent.OutputObject>;
@@ -790,6 +816,10 @@ getEvent(key: 'Unpaused'): TypedContractEvent<UnpausedEvent.InputTuple, Unpaused
       BaseUrisUpdated: TypedContractEvent<BaseUrisUpdatedEvent.InputTuple, BaseUrisUpdatedEvent.OutputTuple, BaseUrisUpdatedEvent.OutputObject>;
     
 
+      'BatchMetadataUpdate(uint256,uint256)': TypedContractEvent<BatchMetadataUpdateEvent.InputTuple, BatchMetadataUpdateEvent.OutputTuple, BatchMetadataUpdateEvent.OutputObject>;
+      BatchMetadataUpdate: TypedContractEvent<BatchMetadataUpdateEvent.InputTuple, BatchMetadataUpdateEvent.OutputTuple, BatchMetadataUpdateEvent.OutputObject>;
+    
+
       'CheckInRegistryUpdated(address,address)': TypedContractEvent<CheckInRegistryUpdatedEvent.InputTuple, CheckInRegistryUpdatedEvent.OutputTuple, CheckInRegistryUpdatedEvent.OutputObject>;
       CheckInRegistryUpdated: TypedContractEvent<CheckInRegistryUpdatedEvent.InputTuple, CheckInRegistryUpdatedEvent.OutputTuple, CheckInRegistryUpdatedEvent.OutputObject>;
     
@@ -800,6 +830,10 @@ getEvent(key: 'Unpaused'): TypedContractEvent<UnpausedEvent.InputTuple, Unpaused
 
       'MarketplaceUpdated(address,address)': TypedContractEvent<MarketplaceUpdatedEvent.InputTuple, MarketplaceUpdatedEvent.OutputTuple, MarketplaceUpdatedEvent.OutputObject>;
       MarketplaceUpdated: TypedContractEvent<MarketplaceUpdatedEvent.InputTuple, MarketplaceUpdatedEvent.OutputTuple, MarketplaceUpdatedEvent.OutputObject>;
+    
+
+      'MetadataUpdate(uint256)': TypedContractEvent<MetadataUpdateEvent.InputTuple, MetadataUpdateEvent.OutputTuple, MetadataUpdateEvent.OutputObject>;
+      MetadataUpdate: TypedContractEvent<MetadataUpdateEvent.InputTuple, MetadataUpdateEvent.OutputTuple, MetadataUpdateEvent.OutputObject>;
     
 
       'Paused(address)': TypedContractEvent<PausedEvent.InputTuple, PausedEvent.OutputTuple, PausedEvent.OutputObject>;

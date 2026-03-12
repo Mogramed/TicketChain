@@ -22,6 +22,8 @@ export const TICKET_NFT_ABI = [
   "event PrimaryMinted(address indexed buyer, uint256 indexed tokenId, uint256 paidAmount)",
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
   "event CollectibleModeUpdated(bool enabled)",
+  "event BaseUrisUpdated(string baseTokenURI, string collectibleBaseURI)",
+  "event BatchMetadataUpdate(uint256 _fromTokenId, uint256 _toTokenId)",
 ] as const;
 
 export const MARKETPLACE_ABI = [
@@ -42,5 +44,9 @@ export const CHECK_IN_REGISTRY_ABI = [
   "function hasRole(bytes32 role, address account) view returns (bool)",
   "function isUsed(uint256 tokenId) view returns (bool)",
   "function markUsed(uint256 tokenId)",
+  "function grantScanner(address account)",
+  "function revokeScanner(address account)",
   "event TicketMarkedUsed(uint256 indexed tokenId, address indexed scanner)",
+  "event ScannerGranted(address indexed account)",
+  "event ScannerRevoked(address indexed account)",
 ] as const;

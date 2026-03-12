@@ -30,6 +30,9 @@ export function SettingsPage() {
   if (userRoles.isAdmin) {
     roleBadges.push(t("roleAdmin"));
   }
+  if (userRoles.isScannerAdmin) {
+    roleBadges.push("Scanner admin");
+  }
   if (userRoles.isPauser) {
     roleBadges.push(t("rolePauser"));
   }

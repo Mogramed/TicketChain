@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { loadWatchlist, saveWatchlist } from "../../lib/watchlistStorage";
 import type { MarketplaceView } from "../../types/chainticket";
 
-export function useWatchlistAlerts(listings: MarketplaceView[]) {
+export function useWatchlistAlerts(ticketEventId: string, listings: MarketplaceView[]) {
   const [watchlist, setWatchlist] = useState<Set<string>>(() =>
     typeof window === "undefined" ? new Set<string>() : loadWatchlist(),
   );
@@ -15,7 +15,7 @@ export function useWatchlistAlerts(listings: MarketplaceView[]) {
     const generatedAlerts: string[] = [];
 
     for (const listing of listings) {
-      const tokenKey = listing.tokenId.toString();
+      const tokenKey = `${ticketEventId}:${listing.tokenId.toString()}`;
       nextMap.set(tokenKey, listing.price);
 
       if (!watchlist.has(tokenKey)) {
@@ -24,9 +24,9 @@ export function useWatchlistAlerts(listings: MarketplaceView[]) {
 
       const previousPrice = previousListingsRef.current.get(tokenKey);
       if (previousPrice === undefined) {
-        generatedAlerts.push(`Watched ticket #${tokenKey} is now listed.`);
+        generatedAlerts.push(`Watched ticket ${tokenKey} is now listed.`);
       } else if (listing.price < previousPrice) {
-        generatedAlerts.push(`Price drop on watched ticket #${tokenKey}.`);
+        generatedAlerts.push(`Price drop on watched ticket ${tokenKey}.`);
       }
     }
 
@@ -36,12 +36,12 @@ export function useWatchlistAlerts(listings: MarketplaceView[]) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setWatchAlerts((prev) => [...generatedAlerts, ...prev].slice(0, 20));
     }
-  }, [listings, watchlist]);
+  }, [listings, ticketEventId, watchlist]);
 
   const toggleWatch = useCallback((tokenId: bigint) => {
     setWatchlist((current) => {
       const next = new Set(current);
-      const key = tokenId.toString();
+      const key = `${ticketEventId}:${tokenId.toString()}`;
 
       if (next.has(key)) {
         next.delete(key);
@@ -52,7 +52,7 @@ export function useWatchlistAlerts(listings: MarketplaceView[]) {
       saveWatchlist(next);
       return next;
     });
-  }, []);
+  }, [ticketEventId]);
 
   return {
     watchlist,

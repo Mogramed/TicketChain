@@ -22,4 +22,11 @@ interface ITicketNFT {
     function maxPerWallet() external view returns (uint256);
 
     function isUsed(uint256 tokenId) external view returns (bool);
+
+    function permit(
+        address spender,
+        uint256 tokenId,
+        uint256 deadline,
+        bytes calldata signature
+    ) external;
 }

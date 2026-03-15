@@ -1,4 +1,5 @@
 type HttpMetricKey = string;
+const HTTP_DURATION_BUCKETS_MS = [25, 50, 100, 250, 500, 1000, 2500, 5000] as const;
 
 interface HttpMetricRecord {
   method: string;
@@ -6,6 +7,7 @@ interface HttpMetricRecord {
   statusCode: number;
   total: number;
   durationMsTotal: number;
+  durationBucketCounts: number[];
 }
 
 export interface IndexerStatusSnapshot {
@@ -13,16 +15,34 @@ export interface IndexerStatusSnapshot {
   haltedByRateLimit: boolean;
   haltedReason: string | null;
   currentBatchSize: number;
+  currentBackoffMs: number;
   consecutiveRateLimitErrors: number;
   totalRateLimitErrors: number;
   totalEventsProcessed: number;
   totalMetadataRefreshes: number;
+  totalRangesProcessed: number;
+  totalReorgResets: number;
+  lastRateLimitAt: number | null;
+  lastProcessedAt: number | null;
+  lastProcessedRangeFrom: number | null;
+  lastProcessedRangeTo: number | null;
+  lastProcessedDurationMs: number | null;
+}
+
+export interface HealthAlertSnapshot {
+  code: string;
+  severity: "warning" | "critical";
+  message: string;
 }
 
 export interface MetricsSnapshotInput {
   indexedBlock: number;
   latestBlock: number | null;
   rpcHealthy: boolean;
+  healthOk: boolean;
+  degraded: boolean;
+  stalenessMs: number | null;
+  alerts: HealthAlertSnapshot[];
   indexer: IndexerStatusSnapshot;
 }
 
@@ -64,6 +84,11 @@ export class MetricsStore {
       statusCode: input.statusCode,
       total: (previous?.total ?? 0) + 1,
       durationMsTotal: (previous?.durationMsTotal ?? 0) + input.durationMs,
+      durationBucketCounts:
+        previous?.durationBucketCounts.map((count, index) =>
+          input.durationMs <= HTTP_DURATION_BUCKETS_MS[index] ? count + 1 : count,
+        ) ??
+        HTTP_DURATION_BUCKETS_MS.map((bucket) => (input.durationMs <= bucket ? 1 : 0)),
     });
   }
 
@@ -112,6 +137,9 @@ export class MetricsStore {
       "# HELP chainticket_indexer_current_batch_size Current indexer batch size.",
       "# TYPE chainticket_indexer_current_batch_size gauge",
       metricLine("chainticket_indexer_current_batch_size", input.indexer.currentBatchSize),
+      "# HELP chainticket_indexer_current_backoff_ms Current rate-limit backoff delay in milliseconds.",
+      "# TYPE chainticket_indexer_current_backoff_ms gauge",
+      metricLine("chainticket_indexer_current_backoff_ms", input.indexer.currentBackoffMs),
       "# HELP chainticket_indexer_consecutive_rate_limit_errors Current streak of rate-limit errors.",
       "# TYPE chainticket_indexer_consecutive_rate_limit_errors gauge",
       metricLine(
@@ -136,6 +164,18 @@ export class MetricsStore {
         "chainticket_indexer_metadata_refreshes_total",
         input.indexer.totalMetadataRefreshes,
       ),
+      "# HELP chainticket_indexer_ranges_processed_total Total processed block ranges.",
+      "# TYPE chainticket_indexer_ranges_processed_total counter",
+      metricLine(
+        "chainticket_indexer_ranges_processed_total",
+        input.indexer.totalRangesProcessed,
+      ),
+      "# HELP chainticket_indexer_reorg_resets_total Total indexed-state resets caused by reorg detection.",
+      "# TYPE chainticket_indexer_reorg_resets_total counter",
+      metricLine(
+        "chainticket_indexer_reorg_resets_total",
+        input.indexer.totalReorgResets,
+      ),
       "# HELP chainticket_indexer_indexed_block Last indexed block.",
       "# TYPE chainticket_indexer_indexed_block gauge",
       metricLine("chainticket_indexer_indexed_block", input.indexedBlock),
@@ -145,9 +185,38 @@ export class MetricsStore {
       "# HELP chainticket_indexer_lag_blocks Current lag between latest and indexed block.",
       "# TYPE chainticket_indexer_lag_blocks gauge",
       metricLine("chainticket_indexer_lag_blocks", lag),
+      "# HELP chainticket_indexer_last_processed_at_ms Unix timestamp in milliseconds for the last successful processed range.",
+      "# TYPE chainticket_indexer_last_processed_at_ms gauge",
+      metricLine("chainticket_indexer_last_processed_at_ms", input.indexer.lastProcessedAt ?? -1),
+      "# HELP chainticket_indexer_last_processed_duration_ms Duration in milliseconds of the last successful processed range.",
+      "# TYPE chainticket_indexer_last_processed_duration_ms gauge",
+      metricLine(
+        "chainticket_indexer_last_processed_duration_ms",
+        input.indexer.lastProcessedDurationMs ?? -1,
+      ),
+      "# HELP chainticket_indexer_staleness_ms Milliseconds since the last successful processed range while lag is non-zero.",
+      "# TYPE chainticket_indexer_staleness_ms gauge",
+      metricLine("chainticket_indexer_staleness_ms", input.stalenessMs ?? -1),
       "# HELP chainticket_rpc_healthy Whether the latest RPC health probe succeeded.",
       "# TYPE chainticket_rpc_healthy gauge",
       metricLine("chainticket_rpc_healthy", input.rpcHealthy ? 1 : 0),
+      "# HELP chainticket_health_ok Whether the BFF health check has no active critical alerts.",
+      "# TYPE chainticket_health_ok gauge",
+      metricLine("chainticket_health_ok", input.healthOk ? 1 : 0),
+      "# HELP chainticket_health_degraded Whether the BFF health check has any active warnings or critical alerts.",
+      "# TYPE chainticket_health_degraded gauge",
+      metricLine("chainticket_health_degraded", input.degraded ? 1 : 0),
+      "# HELP chainticket_health_alerts_active_total Number of active health alerts.",
+      "# TYPE chainticket_health_alerts_active_total gauge",
+      metricLine("chainticket_health_alerts_active_total", input.alerts.length),
+      "# HELP chainticket_health_alert_active Active health alerts by code and severity.",
+      "# TYPE chainticket_health_alert_active gauge",
+      ...input.alerts.map((alert) =>
+        metricLine("chainticket_health_alert_active", 1, {
+          code: alert.code,
+          severity: alert.severity,
+        }),
+      ),
       "# HELP chainticket_http_requests_total Total HTTP requests handled by route and status.",
       "# TYPE chainticket_http_requests_total counter",
       ...snapshot.httpRequests.map((entry) =>
@@ -166,6 +235,29 @@ export class MetricsStore {
           status: entry.statusCode,
         }),
       ),
+      "# HELP chainticket_http_request_duration_ms Histogram of HTTP request durations in milliseconds.",
+      "# TYPE chainticket_http_request_duration_ms histogram",
+      ...snapshot.httpRequests.flatMap((entry) => {
+        const labels = {
+          method: entry.method,
+          path: entry.path,
+          status: entry.statusCode,
+        };
+        return [
+          ...HTTP_DURATION_BUCKETS_MS.map((bucket, index) =>
+            metricLine("chainticket_http_request_duration_ms_bucket", entry.durationBucketCounts[index] ?? 0, {
+              ...labels,
+              le: bucket,
+            }),
+          ),
+          metricLine("chainticket_http_request_duration_ms_bucket", entry.total, {
+            ...labels,
+            le: "+Inf",
+          }),
+          metricLine("chainticket_http_request_duration_ms_sum", entry.durationMsTotal, labels),
+          metricLine("chainticket_http_request_duration_ms_count", entry.total, labels),
+        ];
+      }),
       "# HELP chainticket_sse_clients_connected Number of active SSE clients.",
       "# TYPE chainticket_sse_clients_connected gauge",
       metricLine("chainticket_sse_clients_connected", snapshot.sseClientsConnected),

@@ -6,11 +6,12 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 
   export interface CheckInRegistryInterface extends Interface {
-    getFunction(nameOrSignature: "DEFAULT_ADMIN_ROLE" | "SCANNER_ROLE" | "getRoleAdmin" | "grantRole" | "grantScanner" | "hasRole" | "isUsed" | "markUsed" | "renounceRole" | "revokeRole" | "revokeScanner" | "supportsInterface" | "ticketNFT"): FunctionFragment;
+    getFunction(nameOrSignature: "DEFAULT_ADMIN_ROLE" | "SCANNER_ADMIN_ROLE" | "SCANNER_ROLE" | "getRoleAdmin" | "grantRole" | "grantScanner" | "hasRole" | "isUsed" | "markUsed" | "renounceRole" | "revokeRole" | "revokeScanner" | "supportsInterface" | "ticketNFT"): FunctionFragment;
 
     getEvent(nameOrSignatureOrTopic: "RoleAdminChanged" | "RoleGranted" | "RoleRevoked" | "ScannerGranted" | "ScannerRevoked" | "TicketMarkedUsed"): EventFragment;
 
     encodeFunctionData(functionFragment: 'DEFAULT_ADMIN_ROLE', values?: undefined): string;
+encodeFunctionData(functionFragment: 'SCANNER_ADMIN_ROLE', values?: undefined): string;
 encodeFunctionData(functionFragment: 'SCANNER_ROLE', values?: undefined): string;
 encodeFunctionData(functionFragment: 'getRoleAdmin', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'grantRole', values: [BytesLike, AddressLike]): string;
@@ -25,6 +26,7 @@ encodeFunctionData(functionFragment: 'supportsInterface', values: [BytesLike]): 
 encodeFunctionData(functionFragment: 'ticketNFT', values?: undefined): string;
 
     decodeFunctionResult(functionFragment: 'DEFAULT_ADMIN_ROLE', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'SCANNER_ADMIN_ROLE', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'SCANNER_ROLE', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'getRoleAdmin', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'grantRole', data: BytesLike): Result;
@@ -154,6 +156,14 @@ decodeFunctionResult(functionFragment: 'ticketNFT', data: BytesLike): Result;
     
 
     
+    SCANNER_ADMIN_ROLE: TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >
+    
+
+    
     SCANNER_ROLE: TypedContractMethod<
       [],
       [string],
@@ -253,6 +263,11 @@ decodeFunctionResult(functionFragment: 'ticketNFT', data: BytesLike): Result;
     getFunction<T extends ContractMethod = ContractMethod>(key: string | FunctionFragment): T;
 
     getFunction(nameOrSignature: 'DEFAULT_ADMIN_ROLE'): TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >;
+getFunction(nameOrSignature: 'SCANNER_ADMIN_ROLE'): TypedContractMethod<
       [],
       [string],
       'view'

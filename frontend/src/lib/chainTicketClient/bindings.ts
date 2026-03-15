@@ -1,8 +1,10 @@
 import {
   Contract,
   JsonRpcProvider,
+  type Provider,
   type ContractRunner,
   type Signer,
+  type TypedDataField,
   type TransactionResponse,
 } from "ethers";
 
@@ -26,8 +28,20 @@ import type { ChainTicketBindings } from "./internalTypes";
 
 export interface ChainTicketClientOptions {
   signer?: Signer;
-  readProvider?: JsonRpcProvider;
+  readProvider?: Provider;
 }
+
+const PERMIT_VERSION = "1";
+const PERMIT_LISTING_TTL_SECONDS = 15n * 60n;
+const READ_PROVIDER_CACHE = new Map<string, JsonRpcProvider>();
+const PERMIT_TYPES: Record<string, TypedDataField[]> = {
+  Permit: [
+    { name: "spender", type: "address" },
+    { name: "tokenId", type: "uint256" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+  ],
+};
 
 function requireSigner(signer: Signer | undefined, message: string): Signer {
   if (!signer) {
@@ -36,7 +50,28 @@ function requireSigner(signer: Signer | undefined, message: string): Signer {
   return signer;
 }
 
+function getReadProvider(
+  config: ContractConfig,
+  providedProvider?: Provider,
+): Provider {
+  if (providedProvider) {
+    return providedProvider;
+  }
+
+  const cacheKey = `${config.chainId}:${config.rpcUrl}`;
+  const cachedProvider = READ_PROVIDER_CACHE.get(cacheKey);
+  if (cachedProvider) {
+    return cachedProvider;
+  }
+
+  const provider = new JsonRpcProvider(config.rpcUrl, config.chainId);
+  provider.pollingInterval = 30_000;
+  READ_PROVIDER_CACHE.set(cacheKey, provider);
+  return provider;
+}
+
 function buildSubscribeEvents(
+  ticketEventId: string | undefined,
   ticketRead: Contract,
   marketplaceRead: Contract,
   checkInRead: Contract,
@@ -46,6 +81,7 @@ function buildSubscribeEvents(
       const log = parseTransferLog(getLogEventFromArgs(args));
       onEvent({
         type: "transfer",
+        ticketEventId,
         tokenId: log.tokenId,
         txHash: log.txHash,
         blockNumber: log.blockNumber,
@@ -56,6 +92,7 @@ function buildSubscribeEvents(
       const log = parseListedLog(getLogEventFromArgs(args));
       onEvent({
         type: "listed",
+        ticketEventId,
         tokenId: log.tokenId,
         txHash: log.txHash,
         blockNumber: log.blockNumber,
@@ -66,6 +103,7 @@ function buildSubscribeEvents(
       const log = parseCancelledLog(getLogEventFromArgs(args));
       onEvent({
         type: "cancelled",
+        ticketEventId,
         tokenId: log.tokenId,
         txHash: log.txHash,
         blockNumber: log.blockNumber,
@@ -76,6 +114,7 @@ function buildSubscribeEvents(
       const log = parseSoldLog(getLogEventFromArgs(args));
       onEvent({
         type: "sold",
+        ticketEventId,
         tokenId: log.tokenId,
         txHash: log.txHash,
         blockNumber: log.blockNumber,
@@ -86,6 +125,7 @@ function buildSubscribeEvents(
       const log = parseUsedLog(getLogEventFromArgs(args));
       onEvent({
         type: "used",
+        ticketEventId,
         tokenId: log.tokenId,
         txHash: log.txHash,
         blockNumber: log.blockNumber,
@@ -96,6 +136,7 @@ function buildSubscribeEvents(
       const log = parseCollectibleLog(getLogEventFromArgs(args));
       onEvent({
         type: "collectible_mode",
+        ticketEventId,
         txHash: log.txHash,
         blockNumber: log.blockNumber,
       });
@@ -123,8 +164,7 @@ export function createEthersBindings(
   config: ContractConfig,
   options: ChainTicketClientOptions,
 ): ChainTicketBindings {
-  const readProvider =
-    options.readProvider ?? new JsonRpcProvider(config.rpcUrl, config.chainId);
+  const readProvider = getReadProvider(config, options.readProvider);
 
   const ticketRead = new Contract(
     config.ticketNftAddress,
@@ -145,6 +185,36 @@ export function createEthersBindings(
   const getWriteRunner = (): ContractRunner =>
     requireSigner(options.signer, "Connect a wallet to send transactions.");
 
+  const buildPermitListingPayload = async (tokenId: bigint) => {
+    const signer = requireSigner(options.signer, "Connect a wallet to sign permit messages.");
+    const ticketPermitReader = ticketRead as unknown as {
+      name: () => Promise<string>;
+      nonces: (tokenId: bigint) => Promise<bigint>;
+    };
+    const [ticketName, nonce] = await Promise.all([
+      ticketPermitReader.name(),
+      ticketPermitReader.nonces(tokenId),
+    ]);
+    const deadline = BigInt(Math.floor(Date.now() / 1000)) + PERMIT_LISTING_TTL_SECONDS;
+    const signature = await signer.signTypedData(
+      {
+        name: ticketName,
+        version: PERMIT_VERSION,
+        chainId: config.chainId,
+        verifyingContract: config.ticketNftAddress,
+      },
+      PERMIT_TYPES,
+      {
+        spender: config.marketplaceAddress,
+        tokenId,
+        nonce: toBigInt(nonce),
+        deadline,
+      },
+    );
+
+    return { deadline, signature };
+  };
+
   return {
     getSignerAddress: options.signer
       ? async () => {
@@ -157,7 +227,7 @@ export function createEthersBindings(
       const block = await readProvider.getBlock(blockNumber);
       return block ? block.timestamp : null;
     },
-    subscribeEvents: buildSubscribeEvents(ticketRead, marketplaceRead, checkInRead),
+    subscribeEvents: buildSubscribeEvents(config.eventId, ticketRead, marketplaceRead, checkInRead),
     ticket: {
       hasRole: async (role: string, account: string) =>
         Boolean(await ticketRead.hasRole(role, account)),
@@ -283,6 +353,19 @@ export function createEthersBindings(
           list: (tokenId: bigint, price: bigint) => Promise<TransactionResponse>;
         };
         const tx = await writable.list(tokenId, price);
+        return toTxResponse(tx);
+      },
+      listWithPermit: async (tokenId: bigint, price: bigint) => {
+        const { deadline, signature } = await buildPermitListingPayload(tokenId);
+        const writable = marketplaceRead.connect(getWriteRunner()) as unknown as {
+          listWithPermit: (
+            tokenId: bigint,
+            price: bigint,
+            deadline: bigint,
+            signature: string,
+          ) => Promise<TransactionResponse>;
+        };
+        const tx = await writable.listWithPermit(tokenId, price, deadline, signature);
         return toTxResponse(tx);
       },
       cancel: async (tokenId: bigint) => {

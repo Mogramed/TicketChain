@@ -248,6 +248,51 @@ export function buildPreflightAction({
       gasEstimate = simulation.gasEstimate;
     }
 
+    if (action.type === "list_with_permit") {
+      if (action.price <= 0n) {
+        blockers.push("Listing price must be greater than zero.");
+      }
+      if (action.price > primaryPrice) {
+        blockers.push("Listing price exceeds primary cap.");
+      }
+
+      try {
+        const owner = await bindings.ticket.ownerOf(action.tokenId);
+        if (!sameAddress(owner, signerAddress)) {
+          blockers.push("Only the owner can list this ticket.");
+        }
+      } catch (error) {
+        blockers.push(mapEthersError(error));
+      }
+
+      listingHealth = await createListingHealth(bindings, action.tokenId);
+      if (listingHealth.used) {
+        blockers.push("Used tickets cannot be listed.");
+      }
+
+      if (!bindings.marketplace.listWithPermit) {
+        blockers.push("One-step permit listing is unavailable in this wallet client.");
+      } else {
+        warnings.push("Wallet signature will be requested to authorize the marketplace in one step.");
+      }
+
+      const simulation = await safeSimulation(
+        bindings.marketplace.simulateListWithPermit
+          ? () =>
+              bindings.marketplace.simulateListWithPermit?.(action.tokenId, action.price) ??
+              Promise.resolve()
+          : undefined,
+        bindings.marketplace.estimateListWithPermitGas
+          ? () =>
+              bindings.marketplace.estimateListWithPermitGas?.(action.tokenId, action.price) ??
+              Promise.resolve(0n)
+          : undefined,
+        blockers,
+      );
+      simulationPassed = simulation.simulationPassed;
+      gasEstimate = simulation.gasEstimate;
+    }
+
     if (action.type === "cancel") {
       listingHealth = await createListingHealth(
         bindings,

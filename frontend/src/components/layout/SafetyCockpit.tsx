@@ -1,14 +1,17 @@
 import { useI18n } from "../../i18n/I18nContext";
 import { formatPol } from "../../lib/format";
-import { useAppState } from "../../state/AppStateContext";
+import { useAppState } from "../../state/useAppState";
 import { Badge, Card, InfoList, Panel, SectionHeader, Tag } from "../ui/Primitives";
 
 function bffModeLabel(
-  mode: "disabled" | "probing" | "online" | "offline",
+  mode: "disabled" | "probing" | "online" | "degraded" | "offline",
   t: ReturnType<typeof useI18n>["t"],
 ): string {
   if (mode === "online") {
     return t("bffOnline");
+  }
+  if (mode === "degraded") {
+    return t("bffDegraded");
   }
   if (mode === "offline") {
     return t("bffOffline");
@@ -27,6 +30,7 @@ export function SafetyCockpit() {
     systemState,
     walletCapRemaining,
     bffMode,
+    indexedReadsIssue,
     lastChainEvent,
     pendingPreview,
   } = useAppState();
@@ -90,8 +94,10 @@ export function SafetyCockpit() {
         </Card>
         <Card className="safety-feed">
           <h3>{t("liveChainFeed")}</h3>
-          <p>{lastChainEvent}</p>
-          <Badge tone="info">Live events with RPC fallback enabled</Badge>
+          <p>{bffMode === "online" ? lastChainEvent : indexedReadsIssue ?? "Waiting for BFF live stream."}</p>
+          <Badge tone={bffMode === "online" ? "info" : bffMode === "offline" ? "warning" : "default"}>
+            {bffMode === "online" ? "Live events via BFF SSE" : "Live feed paused until indexed reads are ready"}
+          </Badge>
         </Card>
       </div>
 

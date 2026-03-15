@@ -9,7 +9,12 @@ export const tokenIdParamSchema = z.object({
 });
 
 export const listingsQuerySchema = z.object({
+  eventId: z.string().trim().min(1).optional(),
   sort: z.enum(["price_asc", "price_desc", "recent"]).default("recent"),
   limit: z.coerce.number().int().min(1).max(250).default(100),
   offset: z.coerce.number().int().min(0).default(0),
+});
+
+export const eventQuerySchema = z.object({
+  eventId: z.string().trim().min(1).optional(),
 });

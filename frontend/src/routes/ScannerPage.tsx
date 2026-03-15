@@ -12,8 +12,9 @@ import {
   RiskBanner,
 } from "../components/ui/Primitives";
 import { useI18n } from "../i18n/I18nContext";
+import { useTicketScanner } from "../lib/scanner";
 import { parseTokenIdInput } from "../lib/timeline";
-import { useAppState } from "../state/AppStateContext";
+import { useAppState } from "../state/useAppState";
 
 function extractTokenId(rawValue: string): string | null {
   const trimmed = rawValue.trim();
@@ -39,120 +40,72 @@ function extractTokenId(rawValue: string): string | null {
   return firstDigits?.[1] ?? null;
 }
 
+function scannerModeLabel(mode: "native" | "fallback" | "manual"): string {
+  if (mode === "native") {
+    return "Native QR scan";
+  }
+  if (mode === "fallback") {
+    return "Fallback QR scan";
+  }
+  return "Manual mode";
+}
+
 export function ScannerPage() {
   const { t } = useI18n();
   const { userRoles, preparePreview, setErrorMessage, txState, uiMode } = useAppState();
 
   const [tokenInput, setTokenInput] = useState("");
-  const [cameraEnabled, setCameraEnabled] = useState(false);
-  const [cameraError, setCameraError] = useState("");
   const [lastDetectedValue, setLastDetectedValue] = useState("");
   const [scannerNotice, setScannerNotice] = useState("Ready for the next attendee.");
   const [sessionCheckIns, setSessionCheckIns] = useState<string[]>([]);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const detectorRef = useRef<BarcodeDetector | null>(null);
-  const scanIntervalRef = useRef<number | null>(null);
   const lastSubmittedTokenRef = useRef<string>("");
   const sessionCheckInsRef = useRef<string[]>([]);
 
-  const stopCamera = () => {
-    if (scanIntervalRef.current !== null) {
-      window.clearInterval(scanIntervalRef.current);
-      scanIntervalRef.current = null;
-    }
-
-    if (streamRef.current) {
-      for (const track of streamRef.current.getTracks()) {
-        track.stop();
-      }
-      streamRef.current = null;
-    }
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-
-    setCameraEnabled(false);
-  };
-
-  const startCamera = async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError("Camera API not available in this browser.");
-      setScannerNotice("Manual fallback active: camera APIs are unavailable on this device.");
-      return;
-    }
-
-    if (typeof BarcodeDetector === "undefined") {
-      setCameraError("BarcodeDetector API is not available. Use manual token entry.");
-      setScannerNotice("Manual fallback active: QR detection is not supported in this browser.");
-      return;
-    }
-
-    setCameraError("");
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      });
-
-      if (!videoRef.current) {
+  const {
+    mode,
+    cameraEnabled,
+    errorMessage: cameraError,
+    engineLabel,
+    start,
+    stop,
+  } = useTicketScanner({
+    onDetected: (rawValue) => {
+      setLastDetectedValue(rawValue);
+      const tokenId = extractTokenId(rawValue);
+      if (!tokenId) {
+        setScannerNotice("QR payload captured, but no tokenId was detected. Review manually.");
         return;
       }
 
-      streamRef.current = stream;
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play();
+      setTokenInput(tokenId);
+      setScannerNotice(
+        sessionCheckInsRef.current.includes(tokenId)
+          ? `Ticket #${tokenId} was already checked in during this session.`
+          : `Ticket #${tokenId} detected. Review and confirm the check-in.`,
+      );
+    },
+  });
 
-      detectorRef.current = new BarcodeDetector({
-        formats: ["qr_code"],
-      });
-
-      scanIntervalRef.current = window.setInterval(async () => {
-        if (!videoRef.current || !detectorRef.current) {
-          return;
-        }
-
-        try {
-          const results = await detectorRef.current.detect(videoRef.current);
-          if (!results.length) {
-            return;
-          }
-
-          const candidate = results[0]?.rawValue ?? "";
-          const tokenId = extractTokenId(candidate);
-          if (tokenId) {
-            setTokenInput(tokenId);
-            setLastDetectedValue(candidate);
-            setScannerNotice(
-              sessionCheckInsRef.current.includes(tokenId)
-                ? `Ticket #${tokenId} was already checked in during this session.`
-                : `Ticket #${tokenId} detected. Review and confirm the check-in.`,
-            );
-          }
-        } catch {
-          // Ignore transient frame detection errors.
-        }
-      }, 700);
-
-      setCameraEnabled(true);
-    } catch (error) {
-      setCameraError(error instanceof Error ? error.message : "Camera initialization failed.");
-      setScannerNotice("Manual fallback active: camera initialization failed.");
-    }
+  const stopCamera = () => {
+    stop();
+    setScannerNotice("Camera stopped. Manual token entry remains available.");
   };
 
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, []);
+  const startCamera = async () => {
+    const session = await start(videoRef.current);
+    if (session.mode === "manual") {
+      setScannerNotice(
+        session.errorMessage
+          ? `Manual fallback active: ${session.errorMessage}`
+          : "Manual fallback active: no supported QR engine available.",
+      );
+      return;
+    }
+
+    setScannerNotice(`${session.engineLabel} active. Aim at attendee QR code.`);
+  };
 
   useEffect(() => {
     sessionCheckInsRef.current = sessionCheckIns;
@@ -219,7 +172,7 @@ export function ScannerPage() {
     <div className="route-stack scanner-route" data-testid="scanner-page">
       <PageHeader
         title={t("scannerTitle")}
-        subtitle="Gate control interface with high-contrast feedback and immediate check-in actions."
+        subtitle="Gate control interface with native QR scan, ZXing fallback, and manual check-in continuity."
         context={
           <Badge tone={userRoles.isScanner ? "success" : "warning"}>
             {userRoles.isScanner ? "Scanner role ready" : "Scanner role required"}
@@ -305,6 +258,10 @@ export function ScannerPage() {
               <InfoList
                 entries={[
                   {
+                    label: "Scanner mode",
+                    value: `${scannerModeLabel(mode)} (${engineLabel})`,
+                  },
+                  {
                     label: "Camera",
                     value: cameraEnabled ? "Live feed active" : "Manual / standby",
                   },
@@ -344,7 +301,7 @@ export function ScannerPage() {
                 <div className="scanner-overlay">
                   <p>Venue-safe mode</p>
                   <strong>Ready to scan ticket QR</strong>
-                  <span>High contrast camera frame with instant visual feedback.</span>
+                  <span>Fallback order: native scan, ZXing fallback, then manual entry.</span>
                 </div>
               ) : null}
             </div>
@@ -358,6 +315,8 @@ export function ScannerPage() {
         defaultOpenDesktop={uiMode === "advanced"}
       >
         <ul className="plain-list">
+          <li>Native `BarcodeDetector` is used first when QR support is available.</li>
+          <li>ZXing Browser is used as the cross-device fallback scanner.</li>
           <li>Manual token input remains available when camera access is restricted.</li>
           <li>Only wallets with scanner role can submit check-in transactions.</li>
           <li>Check-in writes immutable usage status to the blockchain.</li>

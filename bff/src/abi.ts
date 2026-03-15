@@ -5,8 +5,13 @@ export const TICKET_NFT_ABI = [
   "function maxPerWallet() view returns (uint256)",
   "function paused() view returns (bool)",
   "function collectibleMode() view returns (bool)",
+  "function ownerOf(uint256 tokenId) view returns (address)",
   "function tokenURI(uint256 tokenId) view returns (string)",
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
+  "event Paused(address account)",
+  "event Unpaused(address account)",
+  "event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender)",
+  "event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender)",
   "event CollectibleModeUpdated(bool enabled)",
   "event BaseUrisUpdated(string baseTokenURI, string collectibleBaseURI)",
 ] as const;
@@ -18,5 +23,12 @@ export const MARKETPLACE_ABI = [
 ] as const;
 
 export const CHECKIN_ABI = [
+  "event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender)",
+  "event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender)",
   "event TicketMarkedUsed(uint256 indexed tokenId, address indexed scanner)",
+] as const;
+
+export const FACTORY_ABI = [
+  "function totalEvents() view returns (uint256)",
+  "function getEventAt(uint256 index) view returns ((string eventId,string name,string symbol,uint256 primaryPrice,uint256 maxSupply,address treasury,address admin,address ticketNFT,address marketplace,address checkInRegistry,uint256 deploymentBlock,uint256 registeredAt))",
 ] as const;

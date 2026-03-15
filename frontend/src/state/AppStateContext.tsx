@@ -1,8 +1,5 @@
-/* eslint-disable react-refresh/only-export-components */
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -14,6 +11,7 @@ import { CONTRACT_CONFIG, validateContractConfig } from "../config/contracts";
 import { RUNTIME_CONFIG } from "../config/runtime";
 import { createBffClient } from "../lib/bffClient";
 import { createChainTicketClient } from "../lib/chainTicketClient";
+import { discoverFactoryEvents, getFallbackEventDeployment } from "../lib/eventCatalog";
 import { mapEthersError } from "../lib/errors";
 import { remainingSupply } from "../lib/format";
 import { connectBrowserWallet } from "../lib/wallet";
@@ -23,6 +21,7 @@ import type {
   RuntimeConfig,
   TicketTimelineEntry,
 } from "../types/chainticket";
+import { AppStateValueContext } from "./AppStateValueContext";
 import { useDashboardQueries } from "./appState/dashboardQueries";
 import { eventToLabel } from "./appState/eventLabel";
 import { useUiPreferences } from "./appState/preferences";
@@ -35,11 +34,9 @@ import {
 import { useWalletSession } from "./appState/walletSession";
 import { useWatchlistAlerts } from "./appState/watchlistAlerts";
 
-const AppStateContext = createContext<AppStateContextValue | null>(null);
-
 export function AppStateProvider({
   children,
-  contractConfig = CONTRACT_CONFIG,
+  contractConfig: baseContractConfig = CONTRACT_CONFIG,
   runtimeConfig = RUNTIME_CONFIG,
   createClient = createChainTicketClient,
   walletConnector = connectBrowserWallet,
@@ -55,6 +52,39 @@ export function AppStateProvider({
   const [statusMessage, setStatusMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [lastChainEvent, setLastChainEvent] = useState("No live event yet.");
+  const [bffEventIds, setBffEventIds] = useState<string[]>([]);
+
+  const fallbackEvent = useMemo(
+    () => getFallbackEventDeployment(baseContractConfig),
+    [baseContractConfig],
+  );
+  const [availableEvents, setAvailableEvents] = useState([fallbackEvent]);
+  const [selectedEventId, setSelectedEventId] = useState(fallbackEvent.ticketEventId);
+
+  const selectedEvent = useMemo(
+    () =>
+      availableEvents.find((event) => event.ticketEventId === selectedEventId) ??
+      availableEvents[0] ??
+      fallbackEvent,
+    [availableEvents, fallbackEvent, selectedEventId],
+  );
+
+  const contractConfig = useMemo(
+    () => ({
+      ...baseContractConfig,
+      eventId: selectedEvent.ticketEventId,
+      eventName: selectedEvent.name,
+      deploymentBlock:
+        selectedEvent.deploymentBlock > 0
+          ? selectedEvent.deploymentBlock
+          : baseContractConfig.deploymentBlock,
+      ticketNftAddress: selectedEvent.ticketNftAddress,
+      marketplaceAddress: selectedEvent.marketplaceAddress,
+      checkInRegistryAddress: selectedEvent.checkInRegistryAddress,
+    }),
+    [baseContractConfig, selectedEvent],
+  );
+  const bffSupportsSelectedEvent = bffEventIds.includes(selectedEvent.ticketEventId);
 
   const configIssues = useMemo(() => validateContractConfig(contractConfig), [contractConfig]);
   const hasValidConfig = configIssues.length === 0;
@@ -68,6 +98,78 @@ export function AppStateProvider({
     () => createBffClient(runtimeConfig.apiBaseUrl),
     [runtimeConfig.apiBaseUrl],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAvailableEvents = async () => {
+      let nextEvents = [fallbackEvent];
+      let nextPreferredEventId = runtimeConfig.defaultEventId;
+      let nextBffEventIds: string[] = [];
+
+      if (bffClient) {
+        try {
+          const response = await bffClient.listEvents();
+          if (response.items.length > 0) {
+            nextEvents = response.items;
+          }
+          nextPreferredEventId = response.defaultEventId;
+          nextBffEventIds = response.items.map((event) => event.ticketEventId);
+        } catch {
+          // BFF event catalog is optional.
+        }
+      }
+
+      if (
+        nextEvents.length === 1 &&
+        nextEvents[0]?.ticketEventId === fallbackEvent.ticketEventId &&
+        runtimeConfig.factoryAddress &&
+        !bffClient
+      ) {
+        try {
+          const factoryEvents = await discoverFactoryEvents(
+            baseContractConfig,
+            runtimeConfig.factoryAddress,
+          );
+          if (factoryEvents.length > 0) {
+            nextEvents = factoryEvents;
+          }
+        } catch {
+          // Keep the fallback deployment when direct chain discovery is unavailable.
+        }
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      setBffEventIds(nextBffEventIds);
+      setAvailableEvents(nextEvents);
+      setSelectedEventId((current) => {
+        if (nextEvents.some((event) => event.ticketEventId === current)) {
+          return current;
+        }
+
+        return (
+          nextEvents.find((event) => event.ticketEventId === nextPreferredEventId)?.ticketEventId ??
+          nextEvents[0]?.ticketEventId ??
+          fallbackEvent.ticketEventId
+        );
+      });
+    };
+
+    void loadAvailableEvents();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    baseContractConfig,
+    bffClient,
+    fallbackEvent,
+    runtimeConfig.defaultEventId,
+    runtimeConfig.factoryAddress,
+  ]);
 
   const clearMessages = useCallback(() => {
     setStatusMessage("");
@@ -102,12 +204,14 @@ export function AppStateProvider({
     clearMessages,
     setErrorMessage,
     setStatusMessage,
-    invalidateDashboard,
   });
 
   const {
     bffMode,
-    setBffMode,
+    bffHealth,
+    indexedReadsAvailable,
+    indexedReadsIssue,
+    refetchBffHealth,
     fetchWithFallback,
     systemQuery,
     listingsQuery,
@@ -117,9 +221,11 @@ export function AppStateProvider({
     listings,
     marketStats,
     tickets,
+    shouldRefetchRemoteMarketStats,
   } = useDashboardQueries({
     readClient,
     bffClient,
+    bffReadEnabled: bffSupportsSelectedEvent,
     contractConfig,
     runtimeConfig,
     walletAddress,
@@ -127,12 +233,21 @@ export function AppStateProvider({
 
   const refreshQueries = useCallback(async () => {
     await Promise.all([
+      refetchBffHealth(),
       systemQuery.refetch(),
       listingsQuery.refetch(),
-      marketStatsQuery.refetch(),
+      shouldRefetchRemoteMarketStats ? marketStatsQuery.refetch() : Promise.resolve(null),
       walletAddress ? ticketsQuery.refetch() : Promise.resolve(null),
     ]);
-  }, [listingsQuery, marketStatsQuery, systemQuery, ticketsQuery, walletAddress]);
+  }, [
+      listingsQuery,
+      marketStatsQuery,
+      refetchBffHealth,
+      shouldRefetchRemoteMarketStats,
+      systemQuery,
+      ticketsQuery,
+    walletAddress,
+  ]);
 
   const {
     txState,
@@ -151,7 +266,10 @@ export function AppStateProvider({
     refreshQueries,
   });
 
-  const { watchlist, watchAlerts, toggleWatch } = useWatchlistAlerts(listings);
+  const { watchlist, watchAlerts, toggleWatch } = useWatchlistAlerts(
+    contractConfig.eventId ?? runtimeConfig.defaultEventId,
+    listings,
+  );
 
   const {
     venueSafeMode,
@@ -166,16 +284,15 @@ export function AppStateProvider({
     const issue =
       systemQuery.error ??
       listingsQuery.error ??
-      marketStatsQuery.error ??
       ticketsQuery.error;
 
     if (issue) {
       setErrorMessage(mapEthersError(issue));
     }
-  }, [listingsQuery.error, marketStatsQuery.error, systemQuery.error, ticketsQuery.error]);
+  }, [listingsQuery.error, systemQuery.error, ticketsQuery.error]);
 
   useEffect(() => {
-    if (!readClient) {
+    if (!bffClient || !bffSupportsSelectedEvent || bffMode !== "online") {
       return;
     }
 
@@ -184,23 +301,25 @@ export function AppStateProvider({
       invalidateDashboard();
     };
 
-    const unsubscribeRpc = readClient.watchEvents(onEvent);
-    const unsubscribeSse = bffClient
-      ? bffClient.watchEvents(onEvent, () => {
-          setBffMode("offline");
-        })
-      : () => undefined;
-
-    const pollingId = window.setInterval(() => {
-      invalidateDashboard();
-    }, 25_000);
+    const unsubscribeLive = bffClient.watchEvents(
+      onEvent,
+      () => {
+        setErrorMessage("Live BFF event stream disconnected. Indexed reads stay paused until the stream reconnects.");
+      },
+      selectedEvent.ticketEventId,
+    );
 
     return () => {
-      unsubscribeRpc();
-      unsubscribeSse();
-      window.clearInterval(pollingId);
+      unsubscribeLive();
     };
-  }, [bffClient, invalidateDashboard, readClient, setBffMode]);
+  }, [
+    bffClient,
+    bffMode,
+    bffSupportsSelectedEvent,
+    invalidateDashboard,
+    selectedEvent.ticketEventId,
+    setErrorMessage,
+  ]);
 
   const fetchTicketTimeline = useCallback(
     async (tokenId: bigint): Promise<TicketTimelineEntry[]> => {
@@ -208,12 +327,29 @@ export function AppStateProvider({
         return [];
       }
 
-      return fetchWithFallback(
-        bffClient ? () => bffClient.getTicketTimeline(tokenId) : null,
-        () => readClient.getTicketTimeline(tokenId),
-      );
+      if (bffClient) {
+        if (!indexedReadsAvailable) {
+          return [];
+        }
+
+        return fetchWithFallback(
+          bffSupportsSelectedEvent
+            ? () => bffClient.getTicketTimeline(tokenId, selectedEvent.ticketEventId)
+            : null,
+          () => Promise.resolve([] as TicketTimelineEntry[]),
+        );
+      }
+
+      return fetchWithFallback(null, () => readClient.getTicketTimeline(tokenId));
     },
-    [bffClient, fetchWithFallback, readClient],
+    [
+      bffClient,
+      bffSupportsSelectedEvent,
+      fetchWithFallback,
+      indexedReadsAvailable,
+      readClient,
+      selectedEvent.ticketEventId,
+    ],
   );
 
   const walletCapRemaining = useMemo(() => {
@@ -235,6 +371,14 @@ export function AppStateProvider({
     () => ({
       contractConfig,
       runtimeConfig,
+      availableEvents,
+      selectedEventId,
+      setSelectedEventId,
+      selectedEventName: selectedEvent.name,
+      bffSupportsSelectedEvent,
+      bffHealth,
+      indexedReadsAvailable,
+      indexedReadsIssue,
       hasValidConfig,
       configIssues,
       walletProviders,
@@ -285,6 +429,9 @@ export function AppStateProvider({
     }),
     [
       activity,
+      availableEvents,
+      bffHealth,
+      bffSupportsSelectedEvent,
       bffMode,
       configIssues,
       clearMessages,
@@ -296,6 +443,8 @@ export function AppStateProvider({
       errorMessage,
       fetchTicketTimeline,
       hasValidConfig,
+      indexedReadsAvailable,
+      indexedReadsIssue,
       isConnecting,
       isRefreshing,
       lastChainEvent,
@@ -309,6 +458,9 @@ export function AppStateProvider({
       preparePreview,
       refreshDashboard,
       runtimeConfig,
+      selectedEvent.name,
+      selectedEventId,
+      setSelectedEventId,
       selectedProviderId,
       setSelectedProviderId,
       setPendingPreview,
@@ -338,13 +490,5 @@ export function AppStateProvider({
     ],
   );
 
-  return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
-}
-
-export function useAppState(): AppStateContextValue {
-  const context = useContext(AppStateContext);
-  if (!context) {
-    throw new Error("useAppState must be used inside AppStateProvider.");
-  }
-  return context;
+  return <AppStateValueContext.Provider value={value}>{children}</AppStateValueContext.Provider>;
 }

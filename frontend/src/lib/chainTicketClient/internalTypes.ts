@@ -74,6 +74,10 @@ export interface TicketBindings {
 
 export interface MarketplaceBindings {
   list: (tokenId: bigint, price: bigint) => Promise<TxResponseLike>;
+  listWithPermit?: (
+    tokenId: bigint,
+    price: bigint,
+  ) => Promise<TxResponseLike>;
   cancel: (tokenId: bigint) => Promise<TxResponseLike>;
   buy: (tokenId: bigint, price: bigint) => Promise<TxResponseLike>;
   getListing: (tokenId: bigint) => Promise<ListingValue>;
@@ -81,7 +85,9 @@ export interface MarketplaceBindings {
   queryCancelledEvents?: (fromBlock: number) => Promise<CancelledEvent[]>;
   querySoldEvents?: (fromBlock: number) => Promise<SoldEvent[]>;
   simulateList?: (tokenId: bigint, price: bigint) => Promise<void>;
+  simulateListWithPermit?: (tokenId: bigint, price: bigint) => Promise<void>;
   estimateListGas?: (tokenId: bigint, price: bigint) => Promise<bigint>;
+  estimateListWithPermitGas?: (tokenId: bigint, price: bigint) => Promise<bigint>;
   simulateCancel?: (tokenId: bigint) => Promise<void>;
   estimateCancelGas?: (tokenId: bigint) => Promise<bigint>;
   simulateBuy?: (tokenId: bigint, price: bigint) => Promise<void>;

@@ -14,7 +14,7 @@ import {
 } from "../components/ui/Primitives";
 import { useI18n } from "../i18n/I18nContext";
 import { formatAddress, formatTimestamp } from "../lib/format";
-import { useAppState } from "../state/AppStateContext";
+import { useAppState } from "../state/useAppState";
 
 function preflightSummary(
   ok: boolean,

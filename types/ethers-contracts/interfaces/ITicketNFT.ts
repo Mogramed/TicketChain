@@ -6,7 +6,7 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 
   export interface ITicketNFTInterface extends Interface {
-    getFunction(nameOrSignature: "balanceOf" | "getApproved" | "isApprovedForAll" | "isUsed" | "maxPerWallet" | "ownerOf" | "paused" | "primaryPrice" | "safeTransferFrom"): FunctionFragment;
+    getFunction(nameOrSignature: "balanceOf" | "getApproved" | "isApprovedForAll" | "isUsed" | "maxPerWallet" | "ownerOf" | "paused" | "permit" | "primaryPrice" | "safeTransferFrom"): FunctionFragment;
 
     
 
@@ -17,6 +17,7 @@ encodeFunctionData(functionFragment: 'isUsed', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'maxPerWallet', values?: undefined): string;
 encodeFunctionData(functionFragment: 'ownerOf', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'paused', values?: undefined): string;
+encodeFunctionData(functionFragment: 'permit', values: [AddressLike, BigNumberish, BigNumberish, BytesLike]): string;
 encodeFunctionData(functionFragment: 'primaryPrice', values?: undefined): string;
 encodeFunctionData(functionFragment: 'safeTransferFrom', values: [AddressLike, AddressLike, BigNumberish]): string;
 
@@ -27,6 +28,7 @@ decodeFunctionResult(functionFragment: 'isUsed', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'maxPerWallet', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'ownerOf', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'paused', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'permit', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'primaryPrice', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'safeTransferFrom', data: BytesLike): Result;
   }
@@ -123,6 +125,14 @@ decodeFunctionResult(functionFragment: 'safeTransferFrom', data: BytesLike): Res
     
 
     
+    permit: TypedContractMethod<
+      [spender: AddressLike, tokenId: BigNumberish, deadline: BigNumberish, signature: BytesLike, ],
+      [void],
+      'nonpayable'
+    >
+    
+
+    
     primaryPrice: TypedContractMethod<
       [],
       [bigint],
@@ -175,6 +185,11 @@ getFunction(nameOrSignature: 'paused'): TypedContractMethod<
       [],
       [boolean],
       'view'
+    >;
+getFunction(nameOrSignature: 'permit'): TypedContractMethod<
+      [spender: AddressLike, tokenId: BigNumberish, deadline: BigNumberish, signature: BytesLike, ],
+      [void],
+      'nonpayable'
     >;
 getFunction(nameOrSignature: 'primaryPrice'): TypedContractMethod<
       [],

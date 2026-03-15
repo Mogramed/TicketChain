@@ -6,6 +6,7 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ITicketSystemState} from "./interfaces/ITicketSystemState.sol";
 
 contract CheckInRegistry is AccessControl {
+    bytes32 public constant SCANNER_ADMIN_ROLE = keccak256("SCANNER_ADMIN_ROLE");
     bytes32 public constant SCANNER_ROLE = keccak256("SCANNER_ROLE");
 
     ITicketSystemState public immutable ticketNFT;
@@ -16,19 +17,22 @@ contract CheckInRegistry is AccessControl {
     event ScannerRevoked(address indexed account);
     event TicketMarkedUsed(uint256 indexed tokenId, address indexed scanner);
 
-    constructor(address ticketNFT_) {
+    constructor(address ticketNFT_, address initialAdmin_) {
         require(ticketNFT_ != address(0), "TicketNFT is zero address");
+        require(initialAdmin_ != address(0), "Admin is zero address");
         ticketNFT = ITicketSystemState(ticketNFT_);
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin_);
+        _grantRole(SCANNER_ADMIN_ROLE, initialAdmin_);
+        _setRoleAdmin(SCANNER_ROLE, SCANNER_ADMIN_ROLE);
     }
 
-    function grantScanner(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function grantScanner(address account) external onlyRole(SCANNER_ADMIN_ROLE) {
         require(account != address(0), "Scanner is zero address");
         _grantRole(SCANNER_ROLE, account);
         emit ScannerGranted(account);
     }
 
-    function revokeScanner(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function revokeScanner(address account) external onlyRole(SCANNER_ADMIN_ROLE) {
         _revokeRole(SCANNER_ROLE, account);
         emit ScannerRevoked(account);
     }

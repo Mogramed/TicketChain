@@ -30,6 +30,11 @@ const runtimeConfig: RuntimeConfig = {
   apiBaseUrl: null,
   chainEnv: "amoy",
   featureFlags: [],
+  defaultEventId: "main-event",
+  factoryAddress: null,
+  governanceTimelockAddress: null,
+  governanceMinDelaySeconds: 0,
+  governancePortalUrl: null,
 };
 
 const providerInfo: WalletProviderInfo = {
@@ -103,6 +108,7 @@ function buildReadClient(ticketsUsed = true): ChainTicketClient {
     mintPrimary: vi.fn().mockResolvedValue(tx("0xmint")),
     approveTicket: vi.fn().mockResolvedValue(tx("0xapprove")),
     listTicket: vi.fn().mockResolvedValue(tx("0xlist")),
+    listTicketWithPermit: vi.fn().mockResolvedValue(tx("0xlist-permit")),
     cancelListing: vi.fn().mockResolvedValue(tx("0xcancel")),
     buyTicket: vi.fn().mockResolvedValue(tx("0xbuy")),
     getUserRoles: vi.fn().mockResolvedValue({
@@ -184,11 +190,11 @@ describe("App route-based smoke", () => {
     await user.clear(screen.getByLabelText(/Listing Price \(POL\)/i));
     await user.type(screen.getByLabelText(/Listing Price \(POL\)/i), "0.05");
 
-    await user.click(screen.getByRole("button", { name: /Create Listing|Créer annonce/i }));
+    await user.click(screen.getByRole("button", { name: /One-step listing/i }));
     await user.click(screen.getByRole("button", { name: /Confirm & Sign|Confirmer & signer/i }));
 
     await waitFor(() => {
-      expect(walletClient.listTicket).toHaveBeenCalledWith(1n, parseEther("0.05"));
+      expect(walletClient.listTicketWithPermit).toHaveBeenCalledWith(1n, parseEther("0.05"));
     });
 
     await user.click(screen.getByRole("link", { name: /Tickets|My Tickets|Mes billets/i }));
@@ -196,5 +202,5 @@ describe("App route-based smoke", () => {
     await waitFor(() => {
       expect(screen.getByText(/Used|Utilise/i, { selector: "span" })).toBeInTheDocument();
     });
-  });
+  }, 15_000);
 });

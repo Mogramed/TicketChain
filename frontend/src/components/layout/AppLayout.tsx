@@ -3,7 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 
 import { useI18n } from "../../i18n/I18nContext";
 import { formatAddress } from "../../lib/format";
-import { useAppState } from "../../state/AppStateContext";
+import { useAppState } from "../../state/useAppState";
 import {
   Badge,
   ButtonGroup,
@@ -23,11 +23,15 @@ interface NavigationItem {
 }
 
 function useIsMobileBreakpoint(maxWidth: number): boolean {
+  const mediaQuery = `(max-width: ${maxWidth}px)`;
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     if (typeof window === "undefined") {
       return false;
     }
-    return window.innerWidth <= maxWidth;
+    if (typeof window.matchMedia !== "function") {
+      return window.innerWidth <= maxWidth;
+    }
+    return window.matchMedia(mediaQuery).matches;
   });
 
   useEffect(() => {
@@ -35,16 +39,35 @@ function useIsMobileBreakpoint(maxWidth: number): boolean {
       return;
     }
 
-    const onResize = () => {
-      setIsMobile(window.innerWidth <= maxWidth);
+    if (typeof window.matchMedia !== "function") {
+      const onResize = () => {
+        setIsMobile(window.innerWidth <= maxWidth);
+      };
+
+      window.addEventListener("resize", onResize);
+      return () => {
+        window.removeEventListener("resize", onResize);
+      };
+    }
+
+    const media = window.matchMedia(mediaQuery);
+    const onChange = (event: MediaQueryListEvent) => {
+      setIsMobile(event.matches);
     };
 
-    onResize();
-    window.addEventListener("resize", onResize);
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", onChange);
+    } else {
+      media.addListener(onChange);
+    }
     return () => {
-      window.removeEventListener("resize", onResize);
+      if (typeof media.removeEventListener === "function") {
+        media.removeEventListener("change", onChange);
+      } else {
+        media.removeListener(onChange);
+      }
     };
-  }, [maxWidth]);
+  }, [maxWidth, mediaQuery]);
 
   return isMobile;
 }
@@ -61,10 +84,16 @@ export function AppLayout() {
     walletAddress,
     walletChainId,
     contractConfig,
+    runtimeConfig,
+    availableEvents,
+    selectedEventId,
+    setSelectedEventId,
     isConnecting,
     isRefreshing,
     statusMessage,
     errorMessage,
+    bffMode,
+    indexedReadsIssue,
     hasValidConfig,
     configIssues,
     systemState,
@@ -148,6 +177,20 @@ export function AppLayout() {
             </div>
 
             <ButtonGroup compact>
+              {availableEvents.length > 1 ? (
+                <select
+                  className="wallet-select"
+                  value={selectedEventId}
+                  onChange={(event) => setSelectedEventId(event.target.value)}
+                  aria-label="Ticket event"
+                >
+                  {availableEvents.map((event) => (
+                    <option key={event.ticketEventId} value={event.ticketEventId}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
               <select
                 className="wallet-select"
                 value={selectedProviderId}
@@ -191,6 +234,7 @@ export function AppLayout() {
           </header>
 
           <section className="critical-strip" role="status" aria-live="polite">
+            <Tag tone="default">Event: {contractConfig.eventName ?? contractConfig.eventId ?? "-"}</Tag>
             <Tag tone={systemState?.paused ? "danger" : "success"}>
               {t("systemPause")}: {systemState?.paused ? t("enabled") : t("disabled")}
             </Tag>
@@ -224,6 +268,16 @@ export function AppLayout() {
               cause={configIssues.join(" | ")}
               impact="Wallet and on-chain reads are unavailable until environment variables are corrected."
               action="Update frontend/.env using VITE_* keys only, then restart the app."
+            />
+          ) : null}
+
+          {hasValidConfig && runtimeConfig.apiBaseUrl && indexedReadsIssue ? (
+            <RiskBanner
+              tone={bffMode === "offline" ? "error" : "warning"}
+              title="Backend indexed reads unavailable"
+              cause={indexedReadsIssue}
+              impact="Market listings, owned tickets, timelines, and live indexed views stay unavailable until the BFF is ready."
+              action="Keep the BFF running, confirm DEPLOYMENT_BLOCK matches the deployed contracts, and wait for the indexer to catch up."
             />
           ) : null}
 

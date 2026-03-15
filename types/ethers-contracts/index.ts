@@ -3,15 +3,19 @@
 /* eslint-disable */
 import type * as interfaces from './interfaces/index.js';
 export type { interfaces };
+export type { ChainTicketFactory } from './ChainTicketFactory.js';
 export type { ChainTicketTimelock } from './ChainTicketTimelock.js';
 export type { CheckInRegistry } from './CheckInRegistry.js';
 export type { Marketplace } from './Marketplace.js';
 export type { TicketNFT } from './TicketNFT.js';
 export * as factories from './factories/index.js';
+export { ChainTicketFactory__factory } from './factories/ChainTicketFactory__factory.js';
 export { ChainTicketTimelock__factory } from './factories/ChainTicketTimelock__factory.js';
 export { CheckInRegistry__factory } from './factories/CheckInRegistry__factory.js';
 export type { ICheckInRegistry } from './interfaces/ICheckInRegistry.js';
 export { ICheckInRegistry__factory } from './factories/interfaces/ICheckInRegistry__factory.js';
+export type { IERC4494 } from './interfaces/IERC4494.js';
+export { IERC4494__factory } from './factories/interfaces/IERC4494__factory.js';
 export type { ITicketNFT } from './interfaces/ITicketNFT.js';
 export { ITicketNFT__factory } from './factories/interfaces/ITicketNFT__factory.js';
 export type { ITicketSystemState } from './interfaces/ITicketSystemState.js';

@@ -17,17 +17,18 @@ async function main(): Promise<void> {
     treasury.address,
     "ipfs://ticket/base/",
     "ipfs://ticket/collectible/",
+    admin.address,
   );
   await ticket.waitForDeployment();
 
   const checkInRegistry = await (
     await ethers.getContractFactory("CheckInRegistry", admin)
-  ).deploy(await ticket.getAddress());
+  ).deploy(await ticket.getAddress(), admin.address);
   await checkInRegistry.waitForDeployment();
 
   const marketplace = await (
     await ethers.getContractFactory("Marketplace", admin)
-  ).deploy(await ticket.getAddress(), treasury.address);
+  ).deploy(await ticket.getAddress(), treasury.address, admin.address);
   await marketplace.waitForDeployment();
 
   await (await ticket.setCheckInRegistry(await checkInRegistry.getAddress())).wait();
@@ -63,7 +64,7 @@ async function main(): Promise<void> {
   await (await marketplace.connect(fanB).buy(0n, { value: primaryPrice })).wait();
   const treasuryAfter = await ethers.provider.getBalance(treasury.address);
   const fee = treasuryAfter - treasuryBefore;
-  console.log(`5) Fan B bought token 0, organizer fee received: ${ethers.formatEther(fee)} ETH`);
+  console.log(`5) Fan B bought token 0, organizer fee received: ${ethers.formatEther(fee)} POL`);
 
   await (await checkInRegistry.connect(scanner).markUsed(0n)).wait();
   console.log("6) Check-in success");

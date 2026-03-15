@@ -395,6 +395,19 @@
   background: linear-gradient(155deg, rgba(44, 30, 12, 0.48), rgba(16, 22, 35, 0.82));
 }
 
+.governance-packet-panel {
+  display: grid;
+  gap: var(--arena-space-3);
+}
+
+.governance-packet-preview {
+  min-height: 260px;
+  font-family: "Cascadia Code", "Fira Code", monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  white-space: pre;
+}
+
 .settings-grid {
   display: grid;
   gap: var(--arena-space-3);

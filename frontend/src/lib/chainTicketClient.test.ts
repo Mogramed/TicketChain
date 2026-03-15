@@ -29,6 +29,7 @@ function makeBaseBindings() {
     getBlockTimestamp: vi.fn().mockResolvedValue(null),
     subscribeEvents: vi.fn().mockReturnValue(() => undefined),
     ticket: {
+      hasRole: vi.fn().mockResolvedValue(false),
       primaryPrice: vi.fn().mockResolvedValue(parseEther("0.1")),
       maxSupply: vi.fn().mockResolvedValue(100n),
       totalMinted: vi.fn().mockResolvedValue(3n),
@@ -53,6 +54,7 @@ function makeBaseBindings() {
     },
     marketplace: {
       list: vi.fn().mockResolvedValue(fakeTx("0xlist")),
+      listWithPermit: vi.fn().mockResolvedValue(fakeTx("0xlist-permit")),
       cancel: vi.fn().mockResolvedValue(fakeTx("0xcancel")),
       buy: vi.fn().mockResolvedValue(fakeTx("0xbuy")),
       getListing: vi.fn().mockResolvedValue({
@@ -70,6 +72,7 @@ function makeBaseBindings() {
       querySoldEvents: vi.fn().mockResolvedValue([]),
     },
     checkInRegistry: {
+      hasRole: vi.fn().mockResolvedValue(false),
       isUsed: vi.fn().mockResolvedValue(false),
       queryUsedEvents: vi.fn().mockResolvedValue([]),
     },
@@ -217,12 +220,36 @@ describe("chainTicketClient", () => {
     await client.mintPrimary();
     await client.approveTicket(9n);
     await client.listTicket(9n, parseEther("0.08"));
+    await client.listTicketWithPermit?.(10n, parseEther("0.07"));
     await client.buyTicket(4n, parseEther("0.09"));
 
     expect(bindings.ticket.mintPrimary).toHaveBeenCalledWith(parseEther("0.1"));
     expect(bindings.ticket.approve).toHaveBeenCalledWith(config.marketplaceAddress, 9n);
     expect(bindings.marketplace.list).toHaveBeenCalledWith(9n, parseEther("0.08"));
+    expect(bindings.marketplace.listWithPermit).toHaveBeenCalledWith(10n, parseEther("0.07"));
     expect(bindings.marketplace.buy).toHaveBeenCalledWith(4n, parseEther("0.09"));
+  });
+
+  it("keeps scanner-admin separate from governance admin in role detection", async () => {
+    const bindings = makeBaseBindings();
+    bindings.ticket.hasRole = vi
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    bindings.checkInRegistry.hasRole = vi
+      .fn()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true);
+
+    const client = createChainTicketClientFromBindings(config, bindings);
+    const roles = await client.getUserRoles?.("0x00000000000000000000000000000000000000BB");
+
+    expect(roles).toEqual({
+      isAdmin: false,
+      isScannerAdmin: true,
+      isPauser: true,
+      isScanner: true,
+    });
   });
 
   it("keeps preflight blockers for mint/list/cancel scenarios", async () => {
@@ -260,6 +287,20 @@ describe("chainTicketClient", () => {
         "Used tickets cannot be listed.",
       ]),
     );
+
+    const listWithPermitPreflight = await client.preflightAction({
+      type: "list_with_permit",
+      tokenId: 1n,
+      price: parseEther("0.2"),
+    });
+    expect(listWithPermitPreflight.blockers).toEqual(
+      expect.arrayContaining([
+        "Listing price exceeds primary cap.",
+        "Only the owner can list this ticket.",
+        "Used tickets cannot be listed.",
+      ]),
+    );
+    expect(listWithPermitPreflight.blockers).not.toContain("Marketplace approval missing for this token.");
 
     const cancelPreflight = await client.preflightAction({
       type: "cancel",

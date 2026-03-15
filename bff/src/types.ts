@@ -6,8 +6,32 @@ export type IndexedEventType =
   | "used"
   | "collectible_mode";
 
+export type ContractScope = "ticket" | "checkin_registry";
+
+export type OperationalActivityType =
+  | "paused"
+  | "unpaused"
+  | "role_granted"
+  | "role_revoked";
+
+export interface TicketEventDeployment {
+  ticketEventId: string;
+  name: string;
+  symbol: string;
+  primaryPriceWei: string;
+  maxSupply: string;
+  treasury: string;
+  admin: string;
+  ticketNftAddress: string;
+  marketplaceAddress: string;
+  checkInRegistryAddress: string;
+  deploymentBlock: number;
+  registeredAt: number;
+}
+
 export interface IndexedEventBase {
   id: string;
+  ticketEventId: string;
   type: IndexedEventType;
   blockNumber: number;
   logIndex: number;
@@ -65,8 +89,34 @@ export type IndexedEvent =
   | CollectibleIndexedEvent;
 
 export interface ChainEventPayload {
+  ticketEventId: string;
   type: IndexedEventType;
   tokenId?: string;
   txHash: string;
   blockNumber: number;
+}
+
+export interface OperationalActivity {
+  id: string;
+  ticketEventId: string;
+  contractScope: ContractScope;
+  type: OperationalActivityType;
+  blockNumber: number;
+  logIndex: number;
+  txHash: string;
+  timestamp: number | null;
+  roleId?: string;
+  account?: string;
+  actor?: string;
+}
+
+export interface OperationalRoleAssignment {
+  ticketEventId: string;
+  contractScope: ContractScope;
+  roleId: string;
+  account: string;
+  grantedBy: string | null;
+  isActive: boolean;
+  updatedBlock: number;
+  updatedTxHash: string;
 }

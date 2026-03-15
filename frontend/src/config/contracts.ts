@@ -28,6 +28,8 @@ export const CONTRACT_CONFIG: ContractConfig = {
   explorerTxBaseUrl:
     import.meta.env.VITE_EXPLORER_TX_BASE_URL ?? "https://amoy.polygonscan.com/tx/",
   deploymentBlock: parseNumber(import.meta.env.VITE_DEPLOYMENT_BLOCK, 0),
+  eventId: import.meta.env.VITE_DEFAULT_EVENT_ID?.trim() || "main-event",
+  eventName: import.meta.env.VITE_DEFAULT_EVENT_NAME?.trim() || "Main Event",
   ticketNftAddress: import.meta.env.VITE_TICKET_NFT_ADDRESS ?? FALLBACK_ADDRESS,
   marketplaceAddress: import.meta.env.VITE_MARKETPLACE_ADDRESS ?? FALLBACK_ADDRESS,
   checkInRegistryAddress:

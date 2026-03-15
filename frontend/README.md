@@ -1,14 +1,15 @@
 # ChainTicket Frontend (React + Vite)
 
-ChainTicket frontend V1 lives in `frontend/` and connects directly to the deployed contracts on Polygon Amoy.
+ChainTicket frontend V1 lives in `frontend/` and uses a BFF-first read model on Polygon Amoy, while wallet-signed writes still go through the connected wallet provider.
 
 ## Features
 
 - Wallet discovery with EIP-6963 + injected fallback
+- BFF-first indexed reads for market, tickets, timeline, and organizer views
 - Safety Cockpit (network, pause, wallet-cap, collectible, live chain feed)
 - Preflight transaction engine with simulation + gas estimate before signature
 - Stale listing protection on buy/cancel
-- Live updates from on-chain events + fallback polling
+- Live updates from the BFF event stream
 - Ticket Proof Timeline (mint/transfer/list/sold/used/collectible events)
 - Local market intelligence (floor/median/average + suggested listing price)
 - Watchlist and in-app alerts for availability/price drops
@@ -30,9 +31,14 @@ Set contract addresses in `.env`:
 
 Optional:
 
-- `VITE_DEPLOYMENT_BLOCK`
+- `VITE_DEPLOYMENT_BLOCK` must be the real positive deployment block in single-event mode
 - `VITE_AMOY_RPC_URL`
 - `VITE_EXPLORER_TX_BASE_URL`
+
+Recommended on Amoy:
+
+- set `VITE_API_BASE_URL` to your BFF
+- avoid relying on the public RPC from the browser for indexed application reads
 
 ## Scripts
 

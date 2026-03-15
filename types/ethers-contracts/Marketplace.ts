@@ -13,7 +13,7 @@ export declare namespace Marketplace {
     }
 
   export interface MarketplaceInterface extends Interface {
-    getFunction(nameOrSignature: "DEFAULT_ADMIN_ROLE" | "ORGANIZER_FEE_BPS" | "buy" | "cancel" | "getListing" | "getRoleAdmin" | "grantRole" | "hasRole" | "list" | "renounceRole" | "revokeRole" | "supportsInterface" | "ticketNFT" | "treasury"): FunctionFragment;
+    getFunction(nameOrSignature: "DEFAULT_ADMIN_ROLE" | "ORGANIZER_FEE_BPS" | "buy" | "cancel" | "getListing" | "getRoleAdmin" | "grantRole" | "hasRole" | "list" | "listWithPermit" | "renounceRole" | "revokeRole" | "supportsInterface" | "ticketNFT" | "treasury"): FunctionFragment;
 
     getEvent(nameOrSignatureOrTopic: "Cancelled" | "FeePaid" | "Listed" | "RoleAdminChanged" | "RoleGranted" | "RoleRevoked" | "Sold"): EventFragment;
 
@@ -26,6 +26,7 @@ encodeFunctionData(functionFragment: 'getRoleAdmin', values: [BytesLike]): strin
 encodeFunctionData(functionFragment: 'grantRole', values: [BytesLike, AddressLike]): string;
 encodeFunctionData(functionFragment: 'hasRole', values: [BytesLike, AddressLike]): string;
 encodeFunctionData(functionFragment: 'list', values: [BigNumberish, BigNumberish]): string;
+encodeFunctionData(functionFragment: 'listWithPermit', values: [BigNumberish, BigNumberish, BigNumberish, BytesLike]): string;
 encodeFunctionData(functionFragment: 'renounceRole', values: [BytesLike, AddressLike]): string;
 encodeFunctionData(functionFragment: 'revokeRole', values: [BytesLike, AddressLike]): string;
 encodeFunctionData(functionFragment: 'supportsInterface', values: [BytesLike]): string;
@@ -41,6 +42,7 @@ decodeFunctionResult(functionFragment: 'getRoleAdmin', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'grantRole', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'hasRole', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'list', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'listWithPermit', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'renounceRole', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'revokeRole', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'supportsInterface', data: BytesLike): Result;
@@ -239,6 +241,14 @@ decodeFunctionResult(functionFragment: 'treasury', data: BytesLike): Result;
     
 
     
+    listWithPermit: TypedContractMethod<
+      [tokenId: BigNumberish, price: BigNumberish, deadline: BigNumberish, signature: BytesLike, ],
+      [void],
+      'nonpayable'
+    >
+    
+
+    
     renounceRole: TypedContractMethod<
       [role: BytesLike, callerConfirmation: AddressLike, ],
       [void],
@@ -323,6 +333,11 @@ getFunction(nameOrSignature: 'hasRole'): TypedContractMethod<
     >;
 getFunction(nameOrSignature: 'list'): TypedContractMethod<
       [tokenId: BigNumberish, price: BigNumberish, ],
+      [void],
+      'nonpayable'
+    >;
+getFunction(nameOrSignature: 'listWithPermit'): TypedContractMethod<
+      [tokenId: BigNumberish, price: BigNumberish, deadline: BigNumberish, signature: BytesLike, ],
       [void],
       'nonpayable'
     >;

@@ -2,12 +2,14 @@ export const TICKET_NFT_ABI = [
   "function DEFAULT_ADMIN_ROLE() view returns (bytes32)",
   "function PAUSER_ROLE() view returns (bytes32)",
   "function hasRole(bytes32 role, address account) view returns (bool)",
+  "function name() view returns (string)",
   "function primaryPrice() view returns (uint256)",
   "function maxSupply() view returns (uint256)",
   "function totalMinted() view returns (uint256)",
   "function maxPerWallet() view returns (uint256)",
   "function paused() view returns (bool)",
   "function collectibleMode() view returns (bool)",
+  "function nonces(uint256 tokenId) view returns (uint256)",
   "function isUsed(uint256 tokenId) view returns (bool)",
   "function tokenURI(uint256 tokenId) view returns (string)",
   "function ownerOf(uint256 tokenId) view returns (address)",
@@ -30,6 +32,7 @@ export const MARKETPLACE_ABI = [
   "function DEFAULT_ADMIN_ROLE() view returns (bytes32)",
   "function hasRole(bytes32 role, address account) view returns (bool)",
   "function list(uint256 tokenId, uint256 price)",
+  "function listWithPermit(uint256 tokenId, uint256 price, uint256 deadline, bytes signature)",
   "function cancel(uint256 tokenId)",
   "function buy(uint256 tokenId) payable",
   "function getListing(uint256 tokenId) view returns (tuple(address seller, uint256 price))",
@@ -40,6 +43,7 @@ export const MARKETPLACE_ABI = [
 
 export const CHECK_IN_REGISTRY_ABI = [
   "function DEFAULT_ADMIN_ROLE() view returns (bytes32)",
+  "function SCANNER_ADMIN_ROLE() view returns (bytes32)",
   "function SCANNER_ROLE() view returns (bytes32)",
   "function hasRole(bytes32 role, address account) view returns (bool)",
   "function isUsed(uint256 tokenId) view returns (bool)",
@@ -49,4 +53,9 @@ export const CHECK_IN_REGISTRY_ABI = [
   "event TicketMarkedUsed(uint256 indexed tokenId, address indexed scanner)",
   "event ScannerGranted(address indexed account)",
   "event ScannerRevoked(address indexed account)",
+] as const;
+
+export const CHAIN_TICKET_FACTORY_ABI = [
+  "function totalEvents() view returns (uint256)",
+  "function getEventAt(uint256 index) view returns ((string eventId,string name,string symbol,uint256 primaryPrice,uint256 maxSupply,address treasury,address admin,address ticketNFT,address marketplace,address checkInRegistry,uint256 deploymentBlock,uint256 registeredAt))",
 ] as const;

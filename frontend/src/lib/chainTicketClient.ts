@@ -18,6 +18,7 @@ import {
   DEFAULT_ADMIN_ROLE,
   normalizeAddress,
   PAUSER_ROLE,
+  SCANNER_ADMIN_ROLE,
   sameAddress,
   SCANNER_ROLE,
   ZERO_ADDRESS,
@@ -35,6 +36,7 @@ export function createChainTicketClientFromBindings(
   config: ContractConfig,
   bindings: ChainTicketBindings,
 ): ChainTicketClient {
+  const listWithPermit = bindings.marketplace.listWithPermit;
   const getSignerAddress = async (): Promise<string | null> => {
     if (!bindings.getSignerAddress) {
       return null;
@@ -59,7 +61,7 @@ export function createChainTicketClientFromBindings(
         ? bindings.ticket.hasRole(PAUSER_ROLE, normalizedAddress).catch(() => false)
         : Promise.resolve(false),
       bindings.checkInRegistry.hasRole
-        ? bindings.checkInRegistry.hasRole(DEFAULT_ADMIN_ROLE, normalizedAddress).catch(() => false)
+        ? bindings.checkInRegistry.hasRole(SCANNER_ADMIN_ROLE, normalizedAddress).catch(() => false)
         : Promise.resolve(false),
       bindings.checkInRegistry.hasRole
         ? bindings.checkInRegistry.hasRole(SCANNER_ROLE, normalizedAddress).catch(() => false)
@@ -67,7 +69,7 @@ export function createChainTicketClientFromBindings(
     ]);
 
     return {
-      isAdmin: ticketAdmin || scannerAdmin,
+      isAdmin: ticketAdmin,
       isScannerAdmin: scannerAdmin,
       isPauser: ticketPauser,
       isScanner: scanner,
@@ -228,6 +230,10 @@ export function createChainTicketClientFromBindings(
     approveTicket: async (tokenId: bigint) => bindings.ticket.approve(config.marketplaceAddress, tokenId),
 
     listTicket: async (tokenId: bigint, price: bigint) => bindings.marketplace.list(tokenId, price),
+
+    listTicketWithPermit: listWithPermit
+      ? async (tokenId: bigint, price: bigint) => listWithPermit(tokenId, price)
+      : undefined,
 
     cancelListing: async (tokenId: bigint) => bindings.marketplace.cancel(tokenId),
 

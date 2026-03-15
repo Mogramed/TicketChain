@@ -14,6 +14,27 @@ function normalizeTokenId(value: string): string | null {
   }
 }
 
+function normalizeWatchKey(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const separatorIndex = trimmed.indexOf(":");
+  if (separatorIndex === -1) {
+    return normalizeTokenId(trimmed);
+  }
+
+  const eventId = trimmed.slice(0, separatorIndex).trim();
+  const tokenId = trimmed.slice(separatorIndex + 1);
+  if (!eventId) {
+    return null;
+  }
+
+  const normalizedTokenId = normalizeTokenId(tokenId);
+  return normalizedTokenId ? `${eventId}:${normalizedTokenId}` : null;
+}
+
 export function loadWatchlist(): Set<string> {
   try {
     const raw = window.localStorage.getItem(WATCHLIST_STORAGE_KEY);
@@ -27,7 +48,7 @@ export function loadWatchlist(): Set<string> {
     }
 
     const normalized = parsed
-      .map((value) => normalizeTokenId(value))
+      .map((value) => normalizeWatchKey(value))
       .filter((value): value is string => value !== null);
 
     return new Set(normalized);
@@ -39,9 +60,9 @@ export function loadWatchlist(): Set<string> {
 export function saveWatchlist(values: Set<string>): void {
   try {
     const normalized = Array.from(values)
-      .map((value) => normalizeTokenId(value))
+      .map((value) => normalizeWatchKey(value))
       .filter((value): value is string => value !== null)
-      .sort((left, right) => (BigInt(left) < BigInt(right) ? -1 : 1));
+      .sort((left, right) => left.localeCompare(right));
 
     window.localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(normalized));
   } catch {

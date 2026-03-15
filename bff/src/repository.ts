@@ -1,8 +1,14 @@
 import { pool } from "./db.js";
+import type {
+  OperationalActivity,
+  OperationalRoleAssignment,
+  TicketEventDeployment,
+} from "./types.js";
 
 export type ListingSort = "price_asc" | "price_desc" | "recent";
 
 interface ListingRow {
+  ticket_event_id: string;
   token_id: string;
   seller: string;
   price_wei: string;
@@ -11,6 +17,7 @@ interface ListingRow {
 }
 
 interface TicketRow {
+  ticket_event_id: string;
   token_id: string;
   owner: string;
   used: boolean;
@@ -20,7 +27,8 @@ interface TicketRow {
 }
 
 interface TimelineRow {
-  event_id: string;
+  chain_event_id: string;
+  ticket_event_id: string;
   event_type: string;
   token_id: string | null;
   block_number: string;
@@ -34,6 +42,31 @@ interface TimelineRow {
   price_wei: string | null;
   fee_amount_wei: string | null;
   collectible_enabled: boolean | null;
+}
+
+interface RoleAssignmentRow {
+  ticket_event_id: string;
+  contract_scope: "ticket" | "checkin_registry";
+  role_id: string;
+  account: string;
+  granted_by: string | null;
+  is_active: boolean;
+  updated_block: string;
+  updated_tx_hash: string;
+}
+
+interface OpsActivityRow {
+  activity_id: string;
+  ticket_event_id: string;
+  contract_scope: "ticket" | "checkin_registry";
+  activity_type: "paused" | "unpaused" | "role_granted" | "role_revoked";
+  role_id: string | null;
+  account: string | null;
+  actor: string | null;
+  block_number: string;
+  log_index: number;
+  tx_hash: string;
+  block_timestamp: string | null;
 }
 
 export async function getIndexedBlock(): Promise<number> {
@@ -62,6 +95,7 @@ export async function getLatestProcessedBlockHash(
 }
 
 export async function getActiveListings(params: {
+  ticketEventId: string;
   sort: ListingSort;
   limit: number;
   offset: number;
@@ -76,16 +110,21 @@ export async function getActiveListings(params: {
   const [itemsResult, totalResult] = await Promise.all([
     pool.query<ListingRow>(
       `
-        SELECT token_id, seller, price_wei, is_active, updated_block
-        FROM listing_state
-        WHERE is_active = TRUE
+        SELECT ticket_event_id, token_id, seller, price_wei, is_active, updated_block
+        FROM listing_state_items
+        WHERE ticket_event_id = $3 AND is_active = TRUE
         ORDER BY ${orderBy}
         LIMIT $1 OFFSET $2
       `,
-      [params.limit, params.offset],
+      [params.limit, params.offset, params.ticketEventId],
     ),
     pool.query<{ count: string }>(
-      "SELECT COUNT(*)::text AS count FROM listing_state WHERE is_active = TRUE",
+      `
+        SELECT COUNT(*)::text AS count
+        FROM listing_state_items
+        WHERE ticket_event_id = $1 AND is_active = TRUE
+      `,
+      [params.ticketEventId],
     ),
   ]);
 
@@ -107,7 +146,7 @@ function median(values: bigint[]): bigint | null {
   return (sorted[middle - 1] + sorted[middle]) / 2n;
 }
 
-export async function getMarketStats(): Promise<{
+export async function getMarketStats(ticketEventId: string): Promise<{
   listingCount: number;
   floorPriceWei: string | null;
   medianPriceWei: string | null;
@@ -116,7 +155,12 @@ export async function getMarketStats(): Promise<{
   suggestedListPriceWei: string | null;
 }> {
   const result = await pool.query<{ price_wei: string }>(
-    "SELECT price_wei FROM listing_state WHERE is_active = TRUE",
+    `
+      SELECT price_wei
+      FROM listing_state_items
+      WHERE ticket_event_id = $1 AND is_active = TRUE
+    `,
+    [ticketEventId],
   );
 
   if (!result.rows.length) {
@@ -148,25 +192,32 @@ export async function getMarketStats(): Promise<{
   };
 }
 
-export async function getTicketsByOwner(address: string): Promise<TicketRow[]> {
+export async function getTicketsByOwner(
+  address: string,
+  ticketEventId: string,
+): Promise<TicketRow[]> {
   const result = await pool.query<TicketRow>(
     `
-      SELECT token_id, owner, used, token_uri, listed, listing_price_wei
-      FROM ticket_state
-      WHERE LOWER(owner) = LOWER($1)
+      SELECT ticket_event_id, token_id, owner, used, token_uri, listed, listing_price_wei
+      FROM ticket_state_items
+      WHERE ticket_event_id = $1 AND LOWER(owner) = LOWER($2)
       ORDER BY token_id::numeric ASC
     `,
-    [address],
+    [ticketEventId, address],
   );
 
   return result.rows;
 }
 
-export async function getTicketTimeline(tokenId: string): Promise<TimelineRow[]> {
+export async function getTicketTimeline(
+  tokenId: string,
+  ticketEventId: string,
+): Promise<TimelineRow[]> {
   const result = await pool.query<TimelineRow>(
     `
       SELECT
-        event_id,
+        chain_event_id,
+        ticket_event_id,
         event_type,
         token_id,
         block_number,
@@ -180,13 +231,140 @@ export async function getTicketTimeline(tokenId: string): Promise<TimelineRow[]>
         price_wei,
         fee_amount_wei,
         collectible_enabled
-      FROM indexed_events
-      WHERE token_id = $1 OR (token_id IS NULL AND event_type = 'collectible_mode')
+      FROM indexed_event_log
+      WHERE
+        ticket_event_id = $1
+        AND (
+          token_id = $2
+          OR (token_id IS NULL AND event_type = 'collectible_mode')
+        )
       ORDER BY block_number DESC, log_index DESC
       LIMIT 400
     `,
-    [tokenId],
+    [ticketEventId, tokenId],
   );
 
   return result.rows;
+}
+
+export async function getEventDeployments(): Promise<TicketEventDeployment[]> {
+  const result = await pool.query<{
+    ticket_event_id: string;
+    name: string;
+    symbol: string;
+    primary_price_wei: string;
+    max_supply: string;
+    treasury: string;
+    admin: string;
+    ticket_nft_address: string;
+    marketplace_address: string;
+    checkin_registry_address: string;
+    deployment_block: string;
+    registered_at: string;
+  }>(
+    `
+      SELECT
+        ticket_event_id,
+        name,
+        symbol,
+        primary_price_wei,
+        max_supply,
+        treasury,
+        admin,
+        ticket_nft_address,
+        marketplace_address,
+        checkin_registry_address,
+        deployment_block,
+        registered_at
+      FROM event_deployments
+      ORDER BY deployment_block ASC, ticket_event_id ASC
+    `,
+  );
+
+  return result.rows.map((row) => ({
+    ticketEventId: row.ticket_event_id,
+    name: row.name,
+    symbol: row.symbol,
+    primaryPriceWei: row.primary_price_wei,
+    maxSupply: row.max_supply,
+    treasury: row.treasury,
+    admin: row.admin,
+    ticketNftAddress: row.ticket_nft_address,
+    marketplaceAddress: row.marketplace_address,
+    checkInRegistryAddress: row.checkin_registry_address,
+    deploymentBlock: Number(row.deployment_block),
+    registeredAt: Number(row.registered_at),
+  }));
+}
+
+export async function getOperationalSummary(ticketEventId: string): Promise<{
+  roles: OperationalRoleAssignment[];
+  recentActivity: OperationalActivity[];
+}> {
+  const [rolesResult, activityResult] = await Promise.all([
+    pool.query<RoleAssignmentRow>(
+      `
+        SELECT
+          ticket_event_id,
+          contract_scope,
+          role_id,
+          account,
+          granted_by,
+          is_active,
+          updated_block,
+          updated_tx_hash
+        FROM role_state_items
+        WHERE ticket_event_id = $1 AND is_active = TRUE
+        ORDER BY contract_scope ASC, role_id ASC, account ASC
+      `,
+      [ticketEventId],
+    ),
+    pool.query<OpsActivityRow>(
+      `
+        SELECT
+          activity_id,
+          ticket_event_id,
+          contract_scope,
+          activity_type,
+          role_id,
+          account,
+          actor,
+          block_number,
+          log_index,
+          tx_hash,
+          block_timestamp
+        FROM ops_activity_log
+        WHERE ticket_event_id = $1
+        ORDER BY block_number DESC, log_index DESC
+        LIMIT 40
+      `,
+      [ticketEventId],
+    ),
+  ]);
+
+  return {
+    roles: rolesResult.rows.map((row) => ({
+      ticketEventId: row.ticket_event_id,
+      contractScope: row.contract_scope,
+      roleId: row.role_id,
+      account: row.account,
+      grantedBy: row.granted_by,
+      isActive: row.is_active,
+      updatedBlock: Number(row.updated_block),
+      updatedTxHash: row.updated_tx_hash,
+    })),
+    recentActivity: activityResult.rows.map((row) => ({
+      id: row.activity_id,
+      ticketEventId: row.ticket_event_id,
+      contractScope: row.contract_scope,
+      type: row.activity_type,
+      roleId: row.role_id ?? undefined,
+      account: row.account ?? undefined,
+      actor: row.actor ?? undefined,
+      blockNumber: Number(row.block_number),
+      logIndex: row.log_index,
+      txHash: row.tx_hash,
+      timestamp: row.block_timestamp ? Number(row.block_timestamp) : null,
+    })),
+  };
 }

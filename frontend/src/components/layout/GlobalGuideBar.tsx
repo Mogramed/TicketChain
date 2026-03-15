@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useI18n } from "../../i18n/I18nContext";
-import { useAppState } from "../../state/AppStateContext";
+import { useAppState } from "../../state/useAppState";
 import type { RouteGuideMeta } from "../../types/chainticket";
 import { ButtonGroup, Panel, Tag } from "../ui/Primitives";
 

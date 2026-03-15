@@ -1,0 +1,72 @@
+groups:
+  - name: chainticket-bff
+    rules:
+      - alert: ChainTicketBffRpcUnhealthy
+        expr: chainticket_rpc_healthy == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: chainticket-bff
+        annotations:
+          summary: "ChainTicket BFF RPC probe failed"
+          description: "The BFF cannot confirm RPC health and may be serving stale data."
+
+      - alert: ChainTicketBffIndexerLagWarning
+        expr: chainticket_indexer_lag_blocks >= 20
+        for: 5m
+        labels:
+          severity: warning
+          service: chainticket-bff
+        annotations:
+          summary: "ChainTicket BFF indexer lag warning"
+          description: "Indexer lag is above 20 blocks for at least 5 minutes."
+
+      - alert: ChainTicketBffIndexerLagCritical
+        expr: chainticket_indexer_lag_blocks >= 60
+        for: 5m
+        labels:
+          severity: critical
+          service: chainticket-bff
+        annotations:
+          summary: "ChainTicket BFF indexer lag critical"
+          description: "Indexer lag is above 60 blocks for at least 5 minutes."
+
+      - alert: ChainTicketBffIndexerStalledWarning
+        expr: chainticket_indexer_staleness_ms >= 60000 and chainticket_indexer_lag_blocks > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: chainticket-bff
+        annotations:
+          summary: "ChainTicket BFF indexer stall warning"
+          description: "Indexer has not completed a range for more than 60 seconds while lag is non-zero."
+
+      - alert: ChainTicketBffIndexerStalledCritical
+        expr: chainticket_indexer_staleness_ms >= 180000 and chainticket_indexer_lag_blocks > 0
+        for: 5m
+        labels:
+          severity: critical
+          service: chainticket-bff
+        annotations:
+          summary: "ChainTicket BFF indexer stall critical"
+          description: "Indexer has not completed a range for more than 180 seconds while lag is non-zero."
+
+      - alert: ChainTicketBffIndexerHalted
+        expr: chainticket_indexer_halted_by_rate_limit == 1
+        for: 1m
+        labels:
+          severity: critical
+          service: chainticket-bff
+        annotations:
+          summary: "ChainTicket BFF indexer halted"
+          description: "The indexer stopped itself after repeated rate-limit errors."
+
+      - alert: ChainTicketBffHighRequestLatencyP95
+        expr: histogram_quantile(0.95, sum by (le) (rate(chainticket_http_request_duration_ms_bucket[5m]))) > 1000
+        for: 10m
+        labels:
+          severity: warning
+          service: chainticket-bff
+        annotations:
+          summary: "ChainTicket BFF p95 latency is high"
+          description: "The estimated p95 request latency is above 1000 ms over the last 5 minutes."

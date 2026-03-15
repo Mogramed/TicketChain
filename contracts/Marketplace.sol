@@ -31,29 +31,29 @@ contract Marketplace is AccessControl, ReentrancyGuard {
     );
     event FeePaid(uint256 indexed tokenId, address indexed treasury, uint256 feeAmount);
 
-    constructor(address ticketNFT_, address treasury_) {
+    constructor(address ticketNFT_, address treasury_, address initialAdmin_) {
         require(ticketNFT_ != address(0), "TicketNFT is zero address");
         require(treasury_ != address(0), "Treasury is zero address");
+        require(initialAdmin_ != address(0), "Admin is zero address");
 
         ticketNFT = ITicketNFT(ticketNFT_);
         treasury = treasury_;
 
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin_);
     }
 
     function list(uint256 tokenId, uint256 price) external {
-        require(!ticketNFT.paused(), "System is paused");
-        require(price > 0, "Price must be > 0");
-        require(price <= ticketNFT.primaryPrice(), "Price exceeds primary cap");
-        require(!ticketNFT.isUsed(tokenId), "Used tickets cannot be listed");
-        require(ticketNFT.ownerOf(tokenId) == msg.sender, "Only owner can list");
+        _createListing(msg.sender, tokenId, price);
+    }
 
-        bool approvedForToken = ticketNFT.getApproved(tokenId) == address(this);
-        bool approvedForAll = ticketNFT.isApprovedForAll(msg.sender, address(this));
-        require(approvedForToken || approvedForAll, "Marketplace not approved");
-
-        _listings[tokenId] = Listing({seller: msg.sender, price: price});
-        emit Listed(tokenId, msg.sender, price);
+    function listWithPermit(
+        uint256 tokenId,
+        uint256 price,
+        uint256 deadline,
+        bytes calldata signature
+    ) external {
+        ticketNFT.permit(address(this), tokenId, deadline, signature);
+        _createListing(msg.sender, tokenId, price);
     }
 
     function cancel(uint256 tokenId) external {
@@ -100,5 +100,20 @@ contract Marketplace is AccessControl, ReentrancyGuard {
 
     function getListing(uint256 tokenId) external view returns (Listing memory) {
         return _listings[tokenId];
+    }
+
+    function _createListing(address seller, uint256 tokenId, uint256 price) private {
+        require(!ticketNFT.paused(), "System is paused");
+        require(price > 0, "Price must be > 0");
+        require(price <= ticketNFT.primaryPrice(), "Price exceeds primary cap");
+        require(!ticketNFT.isUsed(tokenId), "Used tickets cannot be listed");
+        require(ticketNFT.ownerOf(tokenId) == seller, "Only owner can list");
+
+        bool approvedForToken = ticketNFT.getApproved(tokenId) == address(this);
+        bool approvedForAll = ticketNFT.isApprovedForAll(seller, address(this));
+        require(approvedForToken || approvedForAll, "Marketplace not approved");
+
+        _listings[tokenId] = Listing({seller: seller, price: price});
+        emit Listed(tokenId, seller, price);
     }
 }

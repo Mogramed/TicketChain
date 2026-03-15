@@ -1,5 +1,5 @@
 import { useI18n } from "../../i18n/I18nContext";
-import { useAppState } from "../../state/AppStateContext";
+import { useAppState } from "../../state/useAppState";
 import { Badge, ButtonGroup, InfoList, Panel, RiskBanner } from "../ui/Primitives";
 
 function preflightSummary(

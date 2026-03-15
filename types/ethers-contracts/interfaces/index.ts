@@ -2,5 +2,6 @@
 /* tslint:disable */
 /* eslint-disable */
 export type { ICheckInRegistry } from './ICheckInRegistry.js';
+export type { IERC4494 } from './IERC4494.js';
 export type { ITicketNFT } from './ITicketNFT.js';
 export type { ITicketSystemState } from './ITicketSystemState.js';

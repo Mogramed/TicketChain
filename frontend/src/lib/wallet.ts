@@ -4,6 +4,7 @@ import type { ContractConfig, WalletProviderInfo } from "../types/chainticket";
 
 export interface ConnectedWallet {
   signer: Signer;
+  provider: BrowserProvider;
   address: string;
   chainId: number;
   providerInfo: WalletProviderInfo;
@@ -161,7 +162,7 @@ export async function connectBrowserWallet(
     throw new Error(`Wrong network. Please use ${config.chainName}.`);
   }
 
-  return { signer, address, chainId, providerInfo: resolvedProviderInfo };
+  return { signer, provider: browserProvider, address, chainId, providerInfo: resolvedProviderInfo };
 }
 
 export function subscribeWalletLifecycle(

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 
 import {
   ActionBar,
@@ -15,10 +15,11 @@ import {
   SegmentedToggle,
   Tag,
 } from "../components/ui/Primitives";
+import { IndexedReadinessBanner } from "../components/layout/IndexedReadinessBanner";
 import { useI18n } from "../i18n/I18nContext";
 import { formatAddress, formatPol, parsePolInput } from "../lib/format";
 import { parseTokenIdInput } from "../lib/timeline";
-import { useAppState } from "../state/AppStateContext";
+import { useAppState } from "../state/useAppState";
 import type { MarketplaceView } from "../types/chainticket";
 
 type MarketViewMode = "card" | "table";
@@ -35,6 +36,7 @@ export function MarketPage() {
     listings,
     marketStats,
     walletAddress,
+    contractConfig,
     systemState,
     tickets,
     preparePreview,
@@ -43,7 +45,10 @@ export function MarketPage() {
     toggleWatch,
     uiMode,
     pendingPreview,
+    indexedReadsAvailable,
   } = useAppState();
+  const eventWatchKey = (tokenId: bigint) =>
+    `${contractConfig.eventId ?? "main-event"}:${tokenId.toString()}`;
 
   const [selectedTokenId, setSelectedTokenId] = useState("");
   const [listingPriceInput, setListingPriceInput] = useState("");
@@ -51,6 +56,8 @@ export function MarketPage() {
   const [viewMode, setViewMode] = useState<MarketViewMode>("card");
   const [filterMode, setFilterMode] = useState<MarketFilterMode>("all");
   const [sortMode, setSortMode] = useState<MarketSortMode>("price_asc");
+  const deferredSearchInput = useDeferredValue(searchInput);
+  const deferredListings = useDeferredValue(listings);
 
   const selectedToken = useMemo(() => parseTokenIdInput(selectedTokenId), [selectedTokenId]);
   const selectedOwnedTicket = useMemo(
@@ -62,9 +69,9 @@ export function MarketPage() {
   );
 
   const filteredListings = useMemo(() => {
-    const normalizedSearch = searchInput.trim().toLowerCase();
+    const normalizedSearch = deferredSearchInput.trim().toLowerCase();
 
-    const byFilters = listings.filter((listing) => {
+    const byFilters = deferredListings.filter((listing) => {
       if (filterMode === "mine" && !listingIsMine(listing, walletAddress)) {
         return false;
       }
@@ -89,7 +96,7 @@ export function MarketPage() {
       }
       return left.price < right.price ? -1 : left.price > right.price ? 1 : 0;
     });
-  }, [filterMode, listings, searchInput, sortMode, walletAddress]);
+  }, [deferredListings, deferredSearchInput, filterMode, sortMode, walletAddress]);
 
   const marketPreflight = useMemo(() => {
     if (!pendingPreview?.action) {
@@ -98,6 +105,7 @@ export function MarketPage() {
     if (
       pendingPreview.action.type !== "approve" &&
       pendingPreview.action.type !== "list" &&
+      pendingPreview.action.type !== "list_with_permit" &&
       pendingPreview.action.type !== "cancel" &&
       pendingPreview.action.type !== "buy"
     ) {
@@ -105,12 +113,6 @@ export function MarketPage() {
     }
     return pendingPreview.preflight;
   }, [pendingPreview]);
-
-  const listingNeedsApproval =
-    pendingPreview?.action?.type === "list" &&
-    Boolean(
-      marketPreflight?.blockers.some((blocker) => blocker.includes("Marketplace approval missing")),
-    );
 
   const onApproveSelected = async () => {
     const tokenId = parseTokenIdInput(selectedTokenId);
@@ -147,15 +149,21 @@ export function MarketPage() {
     }
 
     await preparePreview({
-      label: "Create listing",
-      description: "Create a capped resale listing.",
-      action: { type: "list", tokenId, price: parsedPrice.value },
+      label: "Create one-step listing",
+      description: "Create a capped resale listing with an ERC-4494 permit.",
+      action: { type: "list_with_permit", tokenId, price: parsedPrice.value },
       details: [
-        "Verifies ownership and approval.",
+        "Requests one wallet signature for the permit, then submits the listing transaction.",
+        "Verifies ownership without requiring a prior approval transaction.",
         "Checks cap against primary price.",
         "Runs anti-stale listing checks.",
       ],
-      run: (client) => client.listTicket(tokenId, parsedPrice.value),
+      run: async (client) => {
+        if (!client.listTicketWithPermit) {
+          throw new Error("One-step permit listing is unavailable in this wallet client.");
+        }
+        return client.listTicketWithPermit(tokenId, parsedPrice.value);
+      },
     });
   };
 
@@ -253,7 +261,7 @@ export function MarketPage() {
 
         <Card className="market-listing-card">
           <h3>Create or update a listing</h3>
-          <p>Choose a ticket, approve it once for the marketplace, then sign the compliant listing.</p>
+          <p>Use the one-step permit flow to sign listing authority off-chain, then submit the on-chain listing.</p>
           <section className="market-form">
             <label>
               {t("tokenId")}
@@ -298,19 +306,18 @@ export function MarketPage() {
               },
               {
                 label: "Recommended next step",
-                value: listingNeedsApproval
-                  ? "Run approval first, then reopen the listing preview."
-                  : "Approve once if this ticket has never been listed from this wallet.",
+                value:
+                  "Use one-step listing for the default flow, or keep manual approval as a fallback for strict wallets.",
               },
             ]}
           />
 
           <ButtonGroup>
             <button type="button" className="ghost" onClick={() => void onApproveSelected()}>
-              1. {t("approveTicket")}
+              Manual approval
             </button>
             <button type="button" className="primary" onClick={() => void onListSelected()}>
-              2. {t("createListing")}
+              One-step listing
             </button>
             <button type="button" className="ghost" onClick={() => void onCancelSelected()}>
               {t("cancelListing")}
@@ -382,17 +389,11 @@ export function MarketPage() {
         />
       ) : null}
 
-      {listingNeedsApproval ? (
-        <RiskBanner
-          tone="warning"
-          title="Approval is still missing"
-          cause="The marketplace is not approved for the selected ticket."
-          impact="Your listing cannot be submitted until the approval transaction confirms."
-          action="Use the approve action first, wait for confirmation, then retry the listing."
-        />
+      {!indexedReadsAvailable ? (
+        <IndexedReadinessBanner />
       ) : null}
 
-      {filteredListings.length === 0 ? (
+      {indexedReadsAvailable && filteredListings.length === 0 ? (
         <EmptyState
           title={t("emptyListingsTitle")}
           description={t("emptyListingsReason")}
@@ -404,7 +405,7 @@ export function MarketPage() {
         />
       ) : null}
 
-      {filteredListings.length > 0 ? (
+      {indexedReadsAvailable && filteredListings.length > 0 ? (
         <SectionHeader
           title={t("marketAvailableListings")}
           subtitle={t("marketAvailableListingsSubtitle")}
@@ -412,7 +413,7 @@ export function MarketPage() {
         />
       ) : null}
 
-      {viewMode === "card" ? (
+      {indexedReadsAvailable && viewMode === "card" ? (
         <section className="listing-grid">
           {filteredListings.map((listing) => (
             <Card key={listing.tokenId.toString()} className="listing-card live-card">
@@ -438,13 +439,13 @@ export function MarketPage() {
                   {listingIsMine(listing, walletAddress) ? t("yourListing") : t("buySecondary")}
                 </button>
                 <button type="button" className="ghost" onClick={() => toggleWatch(listing.tokenId)}>
-                  {watchlist.has(listing.tokenId.toString()) ? t("unwatch") : t("watch")}
+                  {watchlist.has(eventWatchKey(listing.tokenId)) ? t("unwatch") : t("watch")}
                 </button>
               </ButtonGroup>
             </Card>
           ))}
         </section>
-      ) : (
+      ) : indexedReadsAvailable ? (
         <Panel className="market-table-panel">
           <table className="market-table">
             <thead>
@@ -474,7 +475,7 @@ export function MarketPage() {
                         {listingIsMine(listing, walletAddress) ? t("yourListing") : t("buySecondary")}
                       </button>
                       <button type="button" className="ghost" onClick={() => toggleWatch(listing.tokenId)}>
-                        {watchlist.has(listing.tokenId.toString()) ? t("unwatch") : t("watch")}
+                        {watchlist.has(eventWatchKey(listing.tokenId)) ? t("unwatch") : t("watch")}
                       </button>
                     </ButtonGroup>
                   </td>
@@ -483,7 +484,7 @@ export function MarketPage() {
             </tbody>
           </table>
         </Panel>
-      )}
+      ) : null}
 
     </div>
   );

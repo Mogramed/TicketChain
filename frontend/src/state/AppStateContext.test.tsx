@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { parseEther, type Signer } from "ethers";
+import { BrowserProvider, parseEther, type Provider, type Signer } from "ethers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AppStateProvider, useAppState } from "./AppStateContext";
+import { AppStateProvider } from "./AppStateContext";
+import { useAppState } from "./useAppState";
 import type {
   ChainTicketClient,
   ContractConfig,
@@ -18,7 +19,7 @@ const config: ContractConfig = {
   chainName: "Polygon Amoy",
   rpcUrl: "https://rpc-amoy.polygon.technology",
   explorerTxBaseUrl: "https://amoy.polygonscan.com/tx/",
-  deploymentBlock: 0,
+  deploymentBlock: 100,
   ticketNftAddress: "0x0000000000000000000000000000000000000011",
   marketplaceAddress: "0x0000000000000000000000000000000000000022",
   checkInRegistryAddress: "0x0000000000000000000000000000000000000033",
@@ -79,6 +80,7 @@ function makeClient(overrides: Partial<ChainTicketClient> = {}): ChainTicketClie
     mintPrimary: vi.fn().mockResolvedValue(tx("0xmint")),
     approveTicket: vi.fn().mockResolvedValue(tx("0xapprove")),
     listTicket: vi.fn().mockResolvedValue(tx("0xlist")),
+    listTicketWithPermit: vi.fn().mockResolvedValue(tx("0xlist-permit")),
     cancelListing: vi.fn().mockResolvedValue(tx("0xcancel")),
     buyTicket: vi.fn().mockResolvedValue(tx("0xbuy")),
     getUserRoles: vi.fn().mockResolvedValue({
@@ -161,11 +163,20 @@ function renderWithProvider({
   walletConnector,
 }: {
   runtimeConfig: RuntimeConfig;
-  createClient: (cfg: ContractConfig, options?: { signer?: Signer }) => ChainTicketClient;
+  createClient: (
+    cfg: ContractConfig,
+    options?: { signer?: Signer; readProvider?: Provider },
+  ) => ChainTicketClient;
   walletConnector?: (
     cfg: ContractConfig,
     provider?: WalletProviderInfo,
-  ) => Promise<{ signer: Signer; address: string; chainId: number; providerInfo: WalletProviderInfo }>;
+  ) => Promise<{
+    signer: Signer;
+    provider: BrowserProvider;
+    address: string;
+    chainId: number;
+    providerInfo: WalletProviderInfo;
+  }>;
 }) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -201,19 +212,30 @@ describe("AppStateProvider", () => {
     const readClient = makeClient();
     const walletClient = makeClient();
 
-    const createClient = vi.fn((_cfg: ContractConfig, options?: { signer?: Signer }) =>
-      options?.signer ? walletClient : readClient,
+    const createClient = vi.fn(
+      (_cfg: ContractConfig, options?: { signer?: Signer; readProvider?: Provider }) =>
+        options?.signer ? walletClient : readClient,
     );
 
     const walletConnector = vi.fn().mockResolvedValue({
       signer: {} as Signer,
+      provider: {} as BrowserProvider,
       address: "0x00000000000000000000000000000000000000AA",
       chainId: 80002,
       providerInfo,
     });
 
     renderWithProvider({
-      runtimeConfig: { apiBaseUrl: null, chainEnv: "amoy", featureFlags: [] },
+      runtimeConfig: {
+        apiBaseUrl: null,
+        chainEnv: "amoy",
+        featureFlags: [],
+        defaultEventId: "main-event",
+        factoryAddress: null,
+        governanceTimelockAddress: null,
+        governanceMinDelaySeconds: 0,
+        governancePortalUrl: null,
+      },
       createClient,
       walletConnector,
     });
@@ -224,6 +246,20 @@ describe("AppStateProvider", () => {
     await waitFor(() => {
       expect(screen.getByTestId("wallet-address")).toHaveTextContent("0x00000000000000000000000000000000000000AA");
     });
+    await waitFor(() => {
+      expect(createClient).toHaveBeenCalledTimes(2);
+    });
+    expect(createClient).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        ...config,
+        eventId: "main-event",
+        eventName: "Main Event",
+      }),
+      expect.objectContaining({
+        signer: expect.anything(),
+        readProvider: expect.anything(),
+      }),
+    );
 
     await user.click(screen.getByRole("button", { name: "disconnect" }));
 
@@ -231,8 +267,14 @@ describe("AppStateProvider", () => {
     expect(screen.getByTestId("status-message")).toHaveTextContent("Wallet disconnected.");
   });
 
-  it("falls back from BFF to RPC and recovers bffMode to online", async () => {
+  it("uses BFF health to stay degraded until indexed reads are ready without falling back to RPC", async () => {
+    const eventSourceUrls: string[] = [];
+
     class FakeEventSource {
+      constructor(url: string | URL) {
+        eventSourceUrls.push(String(url));
+      }
+
       addEventListener() {}
       removeEventListener() {}
       close() {}
@@ -240,38 +282,78 @@ describe("AppStateProvider", () => {
 
     vi.stubGlobal("EventSource", FakeEventSource);
 
+    const getSystemStateMock = vi.fn().mockResolvedValue({
+      primaryPrice: parseEther("0.15"),
+      maxSupply: 120n,
+      totalMinted: 10n,
+      maxPerWallet: 2n,
+      paused: false,
+      collectibleMode: false,
+    });
+    const getListingsMock = vi.fn().mockResolvedValue([]);
     const readClient = makeClient({
-      getSystemState: vi.fn().mockResolvedValue({
-        primaryPrice: parseEther("0.15"),
-        maxSupply: 120n,
-        totalMinted: 10n,
-        maxPerWallet: 2n,
-        paused: false,
-        collectibleMode: false,
-      }),
+      getSystemState: getSystemStateMock,
+      getListings: getListingsMock,
     });
 
     const createClient = vi.fn(() => readClient);
 
-    const fetchMock = vi
-      .fn()
-      .mockRejectedValueOnce(new Error("network down"))
-      .mockRejectedValueOnce(new Error("network down"))
-      .mockRejectedValueOnce(new Error("network down"));
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    renderWithProvider({
-      runtimeConfig: { apiBaseUrl: "http://localhost:8787", chainEnv: "amoy", featureFlags: [] },
-      createClient,
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("bff-mode")).toHaveTextContent("offline");
-    });
-
-    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+    let readModelReady = false;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+
+      if (url.includes("/v1/events")) {
+        return new Response(
+          JSON.stringify({
+            defaultEventId: "main-event",
+            items: [
+              {
+                ticketEventId: "main-event",
+                name: "Main Event",
+                symbol: "CTK",
+                primaryPriceWei: parseEther("0.15").toString(),
+                maxSupply: "120",
+                treasury: "0x00000000000000000000000000000000000000aa",
+                admin: "0x00000000000000000000000000000000000000bb",
+                ticketNftAddress: config.ticketNftAddress,
+                marketplaceAddress: config.marketplaceAddress,
+                checkInRegistryAddress: config.checkInRegistryAddress,
+                deploymentBlock: 100,
+                registeredAt: 0,
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+
+      if (url.includes("/v1/health")) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            degraded: !readModelReady,
+            checkedAt: Date.now(),
+            indexedBlock: readModelReady ? 120 : 90,
+            latestBlock: 120,
+            lag: readModelReady ? 0 : 30,
+            stalenessMs: 1500,
+            rpcHealthy: true,
+            readModelReady,
+            configuredDeploymentBlock: 100,
+            alerts: readModelReady
+              ? []
+              : [
+                  {
+                    code: "indexer_lag",
+                    severity: "warning",
+                    message: "Indexer has not caught up past deployment block 100.",
+                  },
+                ],
+          }),
+          { status: 200 },
+        );
+      }
+
       if (url.includes("/v1/system")) {
         return new Response(
           JSON.stringify({
@@ -287,7 +369,19 @@ describe("AppStateProvider", () => {
       }
 
       if (url.includes("/v1/listings")) {
-        return new Response(JSON.stringify({ items: [] }), { status: 200 });
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                tokenId: "1",
+                seller: "0x00000000000000000000000000000000000000aa",
+                priceWei: parseEther("0.08").toString(),
+                isActive: true,
+              },
+            ],
+          }),
+          { status: 200 },
+        );
       }
 
       if (url.includes("/v1/market/stats")) {
@@ -307,12 +401,45 @@ describe("AppStateProvider", () => {
       return new Response(JSON.stringify({ items: [] }), { status: 200 });
     });
 
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithProvider({
+      runtimeConfig: {
+        apiBaseUrl: "http://localhost:8787",
+        chainEnv: "amoy",
+        featureFlags: [],
+        defaultEventId: "main-event",
+        factoryAddress: null,
+        governanceTimelockAddress: null,
+        governanceMinDelaySeconds: 0,
+        governancePortalUrl: null,
+      },
+      createClient,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("bff-mode")).toHaveTextContent("degraded");
+    });
+    expect(getSystemStateMock).not.toHaveBeenCalled();
+    expect(getListingsMock).not.toHaveBeenCalled();
+    expect(eventSourceUrls).toHaveLength(0);
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("/v1/system"),
+      expect.anything(),
+    );
+
+    readModelReady = true;
+
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "refresh" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("bff-mode")).toHaveTextContent("online");
     });
+    expect(getSystemStateMock).not.toHaveBeenCalled();
+    expect(getListingsMock).not.toHaveBeenCalled();
+    expect(eventSourceUrls).toEqual(["http://localhost:8787/v1/events/stream?eventId=main-event"]);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/v1/system"))).toBe(true);
   });
 
   it("handles success and error transaction flows with tx/activity updates", async () => {
@@ -330,19 +457,30 @@ describe("AppStateProvider", () => {
       }),
     });
 
-    const createClient = vi.fn((_cfg: ContractConfig, options?: { signer?: Signer }) =>
-      options?.signer ? walletClient : readClient,
+    const createClient = vi.fn(
+      (_cfg: ContractConfig, options?: { signer?: Signer; readProvider?: Provider }) =>
+        options?.signer ? walletClient : readClient,
     );
 
     const walletConnector = vi.fn().mockResolvedValue({
       signer: {} as Signer,
+      provider: {} as BrowserProvider,
       address: "0x00000000000000000000000000000000000000AA",
       chainId: 80002,
       providerInfo,
     });
 
     renderWithProvider({
-      runtimeConfig: { apiBaseUrl: null, chainEnv: "amoy", featureFlags: [] },
+      runtimeConfig: {
+        apiBaseUrl: null,
+        chainEnv: "amoy",
+        featureFlags: [],
+        defaultEventId: "main-event",
+        factoryAddress: null,
+        governanceTimelockAddress: null,
+        governanceMinDelaySeconds: 0,
+        governancePortalUrl: null,
+      },
       createClient,
       walletConnector,
     });

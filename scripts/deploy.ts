@@ -63,6 +63,7 @@ async function main(): Promise<void> {
 
   const name = process.env.TICKET_NAME ?? "ChainTicket Event";
   const symbol = process.env.TICKET_SYMBOL ?? "CTK";
+  const eventId = process.env.EVENT_ID?.trim() || "";
   const baseTokenURI =
     process.env.BASE_TOKEN_URI ?? "ipfs://chainticket/base/";
   const collectibleBaseURI =
@@ -81,6 +82,12 @@ async function main(): Promise<void> {
     process.env.PAUSER_ADDRESSES ?? "",
     "pauser",
   );
+  const scannerAdminAddresses = uniqueValidAddresses(
+    process.env.SCANNER_ADMIN_ADDRESSES ?? "",
+    "scanner admin",
+  );
+  const deployFactory = parseBoolean(process.env.DEPLOY_CHAIN_TICKET_FACTORY);
+  const chainTicketFactoryAddress = process.env.CHAIN_TICKET_FACTORY_ADDRESS?.trim() || "";
   const governanceAdminAddress = process.env.GOVERNANCE_ADMIN_ADDRESS?.trim() || "";
   const timelockEnabled = parseBoolean(process.env.TIMELOCK_ENABLED);
   const timelockDelaySeconds = Number(process.env.TIMELOCK_MIN_DELAY_SECONDS ?? "86400");
@@ -96,13 +103,45 @@ async function main(): Promise<void> {
   if (governanceAdminAddress && !ethers.isAddress(governanceAdminAddress)) {
     throw new Error(`Invalid GOVERNANCE_ADMIN_ADDRESS in .env: ${governanceAdminAddress}`);
   }
+  if (chainTicketFactoryAddress && !ethers.isAddress(chainTicketFactoryAddress)) {
+    throw new Error(`Invalid CHAIN_TICKET_FACTORY_ADDRESS in .env: ${chainTicketFactoryAddress}`);
+  }
+  if ((deployFactory || chainTicketFactoryAddress) && !eventId) {
+    throw new Error("EVENT_ID is required when using ChainTicketFactory registration.");
+  }
   if (!Number.isFinite(timelockDelaySeconds) || timelockDelaySeconds < 0) {
     throw new Error(`Invalid TIMELOCK_MIN_DELAY_SECONDS in .env: ${process.env.TIMELOCK_MIN_DELAY_SECONDS}`);
+  }
+  if (timelockEnabled && pauserAddresses.length === 0) {
+    throw new Error("TIMELOCK_ENABLED=true requires at least one PAUSER_ADDRESSES entry for operational wallets.");
+  }
+  if (timelockEnabled && scannerAdminAddresses.length === 0) {
+    throw new Error(
+      "TIMELOCK_ENABLED=true requires at least one SCANNER_ADMIN_ADDRESSES entry for venue operations.",
+    );
   }
 
   console.log("Deploying ChainTicket V1 contracts to Amoy...");
   console.log(`Deployer: ${deployer.address}`);
   console.log(`Treasury: ${treasury}`);
+
+  let factoryAddress: string | null = chainTicketFactoryAddress || null;
+  let chainTicketFactory: Contract | null = null;
+  if (deployFactory) {
+    const factoryFactory = await ethers.getContractFactory("ChainTicketFactory", deployer);
+    const factory = await factoryFactory.deploy(deployer.address);
+    await factory.waitForDeployment();
+    factoryAddress = await factory.getAddress();
+    chainTicketFactory = factory as unknown as Contract;
+    console.log(`ChainTicketFactory deployed: ${factoryAddress}`);
+  } else if (factoryAddress) {
+    chainTicketFactory = (await ethers.getContractAt(
+      "ChainTicketFactory",
+      factoryAddress,
+      deployer,
+    )) as unknown as Contract;
+    console.log(`Using ChainTicketFactory: ${factoryAddress}`);
+  }
 
   let timelockAddress: string | null = null;
   let timelockContract: Contract | null = null;
@@ -130,6 +169,7 @@ async function main(): Promise<void> {
     treasury,
     baseTokenURI,
     collectibleBaseURI,
+    deployer.address,
   );
   await ticket.waitForDeployment();
   const ticketAddress = await ticket.getAddress();
@@ -139,7 +179,7 @@ async function main(): Promise<void> {
     "CheckInRegistry",
     deployer,
   );
-  const checkInRegistry = await checkInFactory.deploy(ticketAddress);
+  const checkInRegistry = await checkInFactory.deploy(ticketAddress, deployer.address);
   await checkInRegistry.waitForDeployment();
   const checkInRegistryAddress = await checkInRegistry.getAddress();
   console.log(`CheckInRegistry deployed: ${checkInRegistryAddress}`);
@@ -148,7 +188,7 @@ async function main(): Promise<void> {
     "Marketplace",
     deployer,
   );
-  const marketplace = await marketplaceFactory.deploy(ticketAddress, treasury);
+  const marketplace = await marketplaceFactory.deploy(ticketAddress, treasury, deployer.address);
   await marketplace.waitForDeployment();
   const marketplaceAddress = await marketplace.getAddress();
   console.log(`Marketplace deployed: ${marketplaceAddress}`);
@@ -161,19 +201,10 @@ async function main(): Promise<void> {
   await setMarketplaceTx.wait();
   console.log(`setMarketplace tx: ${explorerTxLink(setMarketplaceTx.hash)}`);
 
-  for (const scannerAddress of uniqueScannerAddresses) {
-    const grantTx = await checkInRegistry.grantScanner(scannerAddress);
-    await grantTx.wait();
-    console.log(
-      `Granted SCANNER_ROLE to ${scannerAddress}: ${explorerTxLink(
-        grantTx.hash,
-      )}`,
-    );
-  }
-
   const governanceTarget = timelockAddress ?? (governanceAdminAddress || null);
   const defaultAdminRole = await ticket.DEFAULT_ADMIN_ROLE();
   const pauserRole = await ticket.PAUSER_ROLE();
+  const scannerAdminRole = await checkInRegistry.SCANNER_ADMIN_ROLE();
 
   if (pauserAddresses.length > 0) {
     for (const pauserAddress of pauserAddresses) {
@@ -188,6 +219,55 @@ async function main(): Promise<void> {
       const revokePauserTx = await ticket.revokeRole(pauserRole, deployer.address);
       await revokePauserTx.wait();
       console.log(`Revoked PAUSER_ROLE from deployer: ${explorerTxLink(revokePauserTx.hash)}`);
+    }
+  }
+
+  if (scannerAdminAddresses.length > 0) {
+    for (const scannerAdminAddress of scannerAdminAddresses) {
+      const grantScannerAdminTx = await checkInRegistry.grantRole(
+        scannerAdminRole,
+        scannerAdminAddress,
+      );
+      await grantScannerAdminTx.wait();
+      console.log(
+        `Granted SCANNER_ADMIN_ROLE to ${scannerAdminAddress}: ${explorerTxLink(
+          grantScannerAdminTx.hash,
+        )}`,
+      );
+    }
+
+    for (const scannerAddress of uniqueScannerAddresses) {
+      const grantTx = await checkInRegistry.grantScanner(scannerAddress);
+      await grantTx.wait();
+      console.log(
+        `Granted SCANNER_ROLE to ${scannerAddress}: ${explorerTxLink(
+          grantTx.hash,
+        )}`,
+      );
+    }
+
+    if (!scannerAdminAddresses.includes(deployer.address)) {
+      const revokeScannerAdminTx = await checkInRegistry.revokeRole(
+        scannerAdminRole,
+        deployer.address,
+      );
+      await revokeScannerAdminTx.wait();
+      console.log(
+        `Revoked SCANNER_ADMIN_ROLE from deployer: ${explorerTxLink(
+          revokeScannerAdminTx.hash,
+        )}`,
+      );
+    }
+  }
+  if (scannerAdminAddresses.length === 0) {
+    for (const scannerAddress of uniqueScannerAddresses) {
+      const grantTx = await checkInRegistry.grantScanner(scannerAddress);
+      await grantTx.wait();
+      console.log(
+        `Granted SCANNER_ROLE to ${scannerAddress}: ${explorerTxLink(
+          grantTx.hash,
+        )}`,
+      );
     }
   }
 
@@ -233,11 +313,36 @@ async function main(): Promise<void> {
     );
   }
 
+  if (chainTicketFactory && factoryAddress) {
+    const finalAdminAddress = governanceTarget ?? deployer.address;
+    const registerEventTx = await chainTicketFactory.registerEvent({
+      eventId,
+      name,
+      symbol,
+      primaryPrice,
+      maxSupply,
+      treasury,
+      admin: finalAdminAddress,
+      ticketNFT: ticketAddress,
+      marketplace: marketplaceAddress,
+      checkInRegistry: checkInRegistryAddress,
+      deploymentBlock: BigInt(await ethers.provider.getBlockNumber()),
+    });
+    await registerEventTx.wait();
+    console.log(`Factory registration tx: ${explorerTxLink(registerEventTx.hash)}`);
+  }
+
   console.log("");
   console.log("Deployment summary");
+  if (eventId) {
+    console.log(`Event ID: ${eventId}`);
+  }
   console.log(`TicketNFT: ${ticketAddress}`);
   console.log(`Marketplace: ${marketplaceAddress}`);
   console.log(`CheckInRegistry: ${checkInRegistryAddress}`);
+  if (factoryAddress) {
+    console.log(`ChainTicketFactory: ${factoryAddress}`);
+  }
   if (timelockAddress) {
     console.log(`ChainTicketTimelock: ${timelockAddress}`);
   }
@@ -249,6 +354,9 @@ async function main(): Promise<void> {
   console.log(`TicketNFT: ${explorerAddressLink(ticketAddress)}`);
   console.log(`Marketplace: ${explorerAddressLink(marketplaceAddress)}`);
   console.log(`CheckInRegistry: ${explorerAddressLink(checkInRegistryAddress)}`);
+  if (factoryAddress) {
+    console.log(`ChainTicketFactory: ${explorerAddressLink(factoryAddress)}`);
+  }
   if (timelockAddress) {
     console.log(`ChainTicketTimelock: ${explorerAddressLink(timelockAddress)}`);
   }

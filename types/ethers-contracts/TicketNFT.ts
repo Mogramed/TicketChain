@@ -6,16 +6,19 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 
   export interface TicketNFTInterface extends Interface {
-    getFunction(nameOrSignature: "DEFAULT_ADMIN_ROLE" | "PAUSER_ROLE" | "approve" | "balanceOf" | "checkInRegistry" | "collectibleMode" | "getApproved" | "getRoleAdmin" | "grantRole" | "hasRole" | "isApprovedForAll" | "isUsed" | "marketplace" | "maxPerWallet" | "maxSupply" | "mintPrimary" | "name" | "ownerOf" | "pause" | "paused" | "primaryPrice" | "renounceRole" | "revokeRole" | "safeTransferFrom(address,address,uint256)" | "safeTransferFrom(address,address,uint256,bytes)" | "setApprovalForAll" | "setBaseUris" | "setCheckInRegistry" | "setCollectibleMode" | "setMarketplace" | "supportsInterface" | "symbol" | "tokenURI" | "totalMinted" | "transferFrom" | "treasury" | "unpause"): FunctionFragment;
+    getFunction(nameOrSignature: "DEFAULT_ADMIN_ROLE" | "DOMAIN_SEPARATOR" | "PAUSER_ROLE" | "PERMIT_TYPEHASH" | "approve" | "balanceOf" | "checkInRegistry" | "collectibleMode" | "eip712Domain" | "getApproved" | "getRoleAdmin" | "grantRole" | "hasRole" | "isApprovedForAll" | "isUsed" | "marketplace" | "maxPerWallet" | "maxSupply" | "mintPrimary" | "name" | "nonces" | "ownerOf" | "pause" | "paused" | "permit" | "primaryPrice" | "renounceRole" | "revokeRole" | "safeTransferFrom(address,address,uint256)" | "safeTransferFrom(address,address,uint256,bytes)" | "setApprovalForAll" | "setBaseUris" | "setCheckInRegistry" | "setCollectibleMode" | "setMarketplace" | "supportsInterface" | "symbol" | "tokenURI" | "totalMinted" | "transferFrom" | "treasury" | "unpause"): FunctionFragment;
 
-    getEvent(nameOrSignatureOrTopic: "Approval" | "ApprovalForAll" | "BaseUrisUpdated" | "BatchMetadataUpdate" | "CheckInRegistryUpdated" | "CollectibleModeUpdated" | "MarketplaceUpdated" | "MetadataUpdate" | "Paused" | "PrimaryMinted" | "RoleAdminChanged" | "RoleGranted" | "RoleRevoked" | "Transfer" | "Unpaused"): EventFragment;
+    getEvent(nameOrSignatureOrTopic: "Approval" | "ApprovalForAll" | "BaseUrisUpdated" | "BatchMetadataUpdate" | "CheckInRegistryUpdated" | "CollectibleModeUpdated" | "EIP712DomainChanged" | "MarketplaceUpdated" | "MetadataUpdate" | "Paused" | "PrimaryMinted" | "RoleAdminChanged" | "RoleGranted" | "RoleRevoked" | "Transfer" | "Unpaused"): EventFragment;
 
     encodeFunctionData(functionFragment: 'DEFAULT_ADMIN_ROLE', values?: undefined): string;
+encodeFunctionData(functionFragment: 'DOMAIN_SEPARATOR', values?: undefined): string;
 encodeFunctionData(functionFragment: 'PAUSER_ROLE', values?: undefined): string;
+encodeFunctionData(functionFragment: 'PERMIT_TYPEHASH', values?: undefined): string;
 encodeFunctionData(functionFragment: 'approve', values: [AddressLike, BigNumberish]): string;
 encodeFunctionData(functionFragment: 'balanceOf', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'checkInRegistry', values?: undefined): string;
 encodeFunctionData(functionFragment: 'collectibleMode', values?: undefined): string;
+encodeFunctionData(functionFragment: 'eip712Domain', values?: undefined): string;
 encodeFunctionData(functionFragment: 'getApproved', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'getRoleAdmin', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'grantRole', values: [BytesLike, AddressLike]): string;
@@ -27,9 +30,11 @@ encodeFunctionData(functionFragment: 'maxPerWallet', values?: undefined): string
 encodeFunctionData(functionFragment: 'maxSupply', values?: undefined): string;
 encodeFunctionData(functionFragment: 'mintPrimary', values?: undefined): string;
 encodeFunctionData(functionFragment: 'name', values?: undefined): string;
+encodeFunctionData(functionFragment: 'nonces', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'ownerOf', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'pause', values?: undefined): string;
 encodeFunctionData(functionFragment: 'paused', values?: undefined): string;
+encodeFunctionData(functionFragment: 'permit', values: [AddressLike, BigNumberish, BigNumberish, BytesLike]): string;
 encodeFunctionData(functionFragment: 'primaryPrice', values?: undefined): string;
 encodeFunctionData(functionFragment: 'renounceRole', values: [BytesLike, AddressLike]): string;
 encodeFunctionData(functionFragment: 'revokeRole', values: [BytesLike, AddressLike]): string;
@@ -49,11 +54,14 @@ encodeFunctionData(functionFragment: 'treasury', values?: undefined): string;
 encodeFunctionData(functionFragment: 'unpause', values?: undefined): string;
 
     decodeFunctionResult(functionFragment: 'DEFAULT_ADMIN_ROLE', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'DOMAIN_SEPARATOR', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'PAUSER_ROLE', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'PERMIT_TYPEHASH', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'approve', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'balanceOf', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'checkInRegistry', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'collectibleMode', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'eip712Domain', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'getApproved', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'getRoleAdmin', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'grantRole', data: BytesLike): Result;
@@ -65,9 +73,11 @@ decodeFunctionResult(functionFragment: 'maxPerWallet', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'maxSupply', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'mintPrimary', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'name', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'nonces', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'ownerOf', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'pause', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'paused', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'permit', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'primaryPrice', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'renounceRole', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'revokeRole', data: BytesLike): Result;
@@ -152,6 +162,18 @@ decodeFunctionResult(functionFragment: 'unpause', data: BytesLike): Result;
       export type InputTuple = [enabled: boolean];
       export type OutputTuple = [enabled: boolean];
       export interface OutputObject {enabled: boolean };
+      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
+      export type Filter = TypedDeferredTopicFilter<Event>
+      export type Log = TypedEventLog<Event>
+      export type LogDescription = TypedLogDescription<Event>
+    }
+
+  
+
+    export namespace EIP712DomainChangedEvent {
+      export type InputTuple = [];
+      export type OutputTuple = [];
+      export interface OutputObject {};
       export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
       export type Filter = TypedDeferredTopicFilter<Event>
       export type Log = TypedEventLog<Event>
@@ -310,7 +332,23 @@ decodeFunctionResult(functionFragment: 'unpause', data: BytesLike): Result;
     
 
     
+    DOMAIN_SEPARATOR: TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >
+    
+
+    
     PAUSER_ROLE: TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >
+    
+
+    
+    PERMIT_TYPEHASH: TypedContractMethod<
       [],
       [string],
       'view'
@@ -345,6 +383,14 @@ decodeFunctionResult(functionFragment: 'unpause', data: BytesLike): Result;
     collectibleMode: TypedContractMethod<
       [],
       [boolean],
+      'view'
+    >
+    
+
+    
+    eip712Domain: TypedContractMethod<
+      [],
+      [[string, string, string, bigint, string, string, bigint[]] & {fields: string, name: string, version: string, chainId: bigint, verifyingContract: string, salt: string, extensions: bigint[] }],
       'view'
     >
     
@@ -438,6 +484,14 @@ decodeFunctionResult(functionFragment: 'unpause', data: BytesLike): Result;
     
 
     
+    nonces: TypedContractMethod<
+      [tokenId: BigNumberish, ],
+      [bigint],
+      'view'
+    >
+    
+
+    
     ownerOf: TypedContractMethod<
       [tokenId: BigNumberish, ],
       [string],
@@ -458,6 +512,14 @@ decodeFunctionResult(functionFragment: 'unpause', data: BytesLike): Result;
       [],
       [boolean],
       'view'
+    >
+    
+
+    
+    permit: TypedContractMethod<
+      [spender: AddressLike, tokenId: BigNumberish, deadline: BigNumberish, signature: BytesLike, ],
+      [void],
+      'nonpayable'
     >
     
 
@@ -605,7 +667,17 @@ decodeFunctionResult(functionFragment: 'unpause', data: BytesLike): Result;
       [string],
       'view'
     >;
+getFunction(nameOrSignature: 'DOMAIN_SEPARATOR'): TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >;
 getFunction(nameOrSignature: 'PAUSER_ROLE'): TypedContractMethod<
+      [],
+      [string],
+      'view'
+    >;
+getFunction(nameOrSignature: 'PERMIT_TYPEHASH'): TypedContractMethod<
       [],
       [string],
       'view'
@@ -628,6 +700,11 @@ getFunction(nameOrSignature: 'checkInRegistry'): TypedContractMethod<
 getFunction(nameOrSignature: 'collectibleMode'): TypedContractMethod<
       [],
       [boolean],
+      'view'
+    >;
+getFunction(nameOrSignature: 'eip712Domain'): TypedContractMethod<
+      [],
+      [[string, string, string, bigint, string, string, bigint[]] & {fields: string, name: string, version: string, chainId: bigint, verifyingContract: string, salt: string, extensions: bigint[] }],
       'view'
     >;
 getFunction(nameOrSignature: 'getApproved'): TypedContractMethod<
@@ -685,6 +762,11 @@ getFunction(nameOrSignature: 'name'): TypedContractMethod<
       [string],
       'view'
     >;
+getFunction(nameOrSignature: 'nonces'): TypedContractMethod<
+      [tokenId: BigNumberish, ],
+      [bigint],
+      'view'
+    >;
 getFunction(nameOrSignature: 'ownerOf'): TypedContractMethod<
       [tokenId: BigNumberish, ],
       [string],
@@ -699,6 +781,11 @@ getFunction(nameOrSignature: 'paused'): TypedContractMethod<
       [],
       [boolean],
       'view'
+    >;
+getFunction(nameOrSignature: 'permit'): TypedContractMethod<
+      [spender: AddressLike, tokenId: BigNumberish, deadline: BigNumberish, signature: BytesLike, ],
+      [void],
+      'nonpayable'
     >;
 getFunction(nameOrSignature: 'primaryPrice'): TypedContractMethod<
       [],
@@ -792,6 +879,7 @@ getEvent(key: 'BaseUrisUpdated'): TypedContractEvent<BaseUrisUpdatedEvent.InputT
 getEvent(key: 'BatchMetadataUpdate'): TypedContractEvent<BatchMetadataUpdateEvent.InputTuple, BatchMetadataUpdateEvent.OutputTuple, BatchMetadataUpdateEvent.OutputObject>;
 getEvent(key: 'CheckInRegistryUpdated'): TypedContractEvent<CheckInRegistryUpdatedEvent.InputTuple, CheckInRegistryUpdatedEvent.OutputTuple, CheckInRegistryUpdatedEvent.OutputObject>;
 getEvent(key: 'CollectibleModeUpdated'): TypedContractEvent<CollectibleModeUpdatedEvent.InputTuple, CollectibleModeUpdatedEvent.OutputTuple, CollectibleModeUpdatedEvent.OutputObject>;
+getEvent(key: 'EIP712DomainChanged'): TypedContractEvent<EIP712DomainChangedEvent.InputTuple, EIP712DomainChangedEvent.OutputTuple, EIP712DomainChangedEvent.OutputObject>;
 getEvent(key: 'MarketplaceUpdated'): TypedContractEvent<MarketplaceUpdatedEvent.InputTuple, MarketplaceUpdatedEvent.OutputTuple, MarketplaceUpdatedEvent.OutputObject>;
 getEvent(key: 'MetadataUpdate'): TypedContractEvent<MetadataUpdateEvent.InputTuple, MetadataUpdateEvent.OutputTuple, MetadataUpdateEvent.OutputObject>;
 getEvent(key: 'Paused'): TypedContractEvent<PausedEvent.InputTuple, PausedEvent.OutputTuple, PausedEvent.OutputObject>;
@@ -826,6 +914,10 @@ getEvent(key: 'Unpaused'): TypedContractEvent<UnpausedEvent.InputTuple, Unpaused
 
       'CollectibleModeUpdated(bool)': TypedContractEvent<CollectibleModeUpdatedEvent.InputTuple, CollectibleModeUpdatedEvent.OutputTuple, CollectibleModeUpdatedEvent.OutputObject>;
       CollectibleModeUpdated: TypedContractEvent<CollectibleModeUpdatedEvent.InputTuple, CollectibleModeUpdatedEvent.OutputTuple, CollectibleModeUpdatedEvent.OutputObject>;
+    
+
+      'EIP712DomainChanged()': TypedContractEvent<EIP712DomainChangedEvent.InputTuple, EIP712DomainChangedEvent.OutputTuple, EIP712DomainChangedEvent.OutputObject>;
+      EIP712DomainChanged: TypedContractEvent<EIP712DomainChangedEvent.InputTuple, EIP712DomainChangedEvent.OutputTuple, EIP712DomainChangedEvent.OutputObject>;
     
 
       'MarketplaceUpdated(address,address)': TypedContractEvent<MarketplaceUpdatedEvent.InputTuple, MarketplaceUpdatedEvent.OutputTuple, MarketplaceUpdatedEvent.OutputObject>;

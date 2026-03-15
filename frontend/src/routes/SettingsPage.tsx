@@ -11,7 +11,7 @@ import {
 } from "../components/ui/Primitives";
 import { Link } from "react-router-dom";
 import { useI18n } from "../i18n/I18nContext";
-import { useAppState } from "../state/AppStateContext";
+import { useAppState } from "../state/useAppState";
 
 export function SettingsPage() {
   const { locale, setLocale, t } = useI18n();
@@ -28,7 +28,7 @@ export function SettingsPage() {
 
   const roleBadges: string[] = [];
   if (userRoles.isAdmin) {
-    roleBadges.push(t("roleAdmin"));
+    roleBadges.push("Governance admin");
   }
   if (userRoles.isScannerAdmin) {
     roleBadges.push("Scanner admin");
@@ -110,6 +110,18 @@ export function SettingsPage() {
               entries={[
                 { label: t("chainEnv"), value: runtimeConfig.chainEnv },
                 { label: t("apiBaseUrl"), value: runtimeConfig.apiBaseUrl ?? "Not configured" },
+                {
+                  label: "Governance timelock",
+                  value: runtimeConfig.governanceTimelockAddress ?? "Not configured",
+                },
+                {
+                  label: "Governance delay",
+                  value: `${runtimeConfig.governanceMinDelaySeconds}s`,
+                },
+                {
+                  label: "Governance portal",
+                  value: runtimeConfig.governancePortalUrl ?? "Not configured",
+                },
                 {
                   label: t("featureFlags"),
                   value: runtimeConfig.featureFlags.length ? runtimeConfig.featureFlags.join(", ") : "None",

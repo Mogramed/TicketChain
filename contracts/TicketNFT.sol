@@ -5,15 +5,20 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IERC4906} from "@openzeppelin/contracts/interfaces/IERC4906.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {ICheckInRegistry} from "./interfaces/ICheckInRegistry.sol";
+import {IERC4494} from "./interfaces/IERC4494.sol";
 
-contract TicketNFT is ERC721, AccessControl, Pausable, IERC4906 {
+contract TicketNFT is ERC721, AccessControl, EIP712, Pausable, IERC4906, IERC4494 {
     using Strings for uint256;
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant PERMIT_TYPEHASH =
+        keccak256("Permit(address spender,uint256 tokenId,uint256 nonce,uint256 deadline)");
 
     uint256 public immutable primaryPrice;
     uint256 public immutable maxSupply;
@@ -28,6 +33,10 @@ contract TicketNFT is ERC721, AccessControl, Pausable, IERC4906 {
     string private _baseTokenURI;
     string private _collectibleBaseURI;
     uint256 private _nextTokenId;
+    mapping(uint256 tokenId => uint256) private _permitNonces;
+
+    error PermitExpired(uint256 deadline);
+    error InvalidPermitSigner(address signer, address owner);
 
     event PrimaryMinted(address indexed buyer, uint256 indexed tokenId, uint256 paidAmount);
     event MarketplaceUpdated(address indexed previousMarketplace, address indexed newMarketplace);
@@ -42,11 +51,13 @@ contract TicketNFT is ERC721, AccessControl, Pausable, IERC4906 {
         uint256 maxSupply_,
         address treasury_,
         string memory baseTokenURI_,
-        string memory collectibleBaseURI_
-    ) ERC721(name_, symbol_) {
+        string memory collectibleBaseURI_,
+        address initialAdmin_
+    ) ERC721(name_, symbol_) EIP712(name_, "1") {
         require(primaryPrice_ > 0, "Primary price must be > 0");
         require(maxSupply_ > 0, "Max supply must be > 0");
         require(treasury_ != address(0), "Treasury is zero address");
+        require(initialAdmin_ != address(0), "Admin is zero address");
 
         primaryPrice = primaryPrice_;
         maxSupply = maxSupply_;
@@ -55,8 +66,8 @@ contract TicketNFT is ERC721, AccessControl, Pausable, IERC4906 {
         _baseTokenURI = baseTokenURI_;
         _collectibleBaseURI = collectibleBaseURI_;
 
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(PAUSER_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin_);
+        _grantRole(PAUSER_ROLE, initialAdmin_);
     }
 
     function mintPrimary() external payable whenNotPaused returns (uint256 tokenId) {
@@ -117,9 +128,43 @@ contract TicketNFT is ERC721, AccessControl, Pausable, IERC4906 {
         return _nextTokenId;
     }
 
+    function DOMAIN_SEPARATOR() external view returns (bytes32) {
+        return _domainSeparatorV4();
+    }
+
+    function nonces(uint256 tokenId) external view returns (uint256) {
+        return _permitNonces[tokenId];
+    }
+
     function isUsed(uint256 tokenId) public view returns (bool) {
         _requireOwned(tokenId);
         return _isMarkedUsed(tokenId);
+    }
+
+    function permit(
+        address spender,
+        uint256 tokenId,
+        uint256 deadline,
+        bytes calldata signature
+    ) external {
+        if (block.timestamp > deadline) {
+            revert PermitExpired(deadline);
+        }
+
+        address owner = _requireOwned(tokenId);
+        uint256 currentNonce = _permitNonces[tokenId];
+        bytes32 structHash = keccak256(
+            abi.encode(PERMIT_TYPEHASH, spender, tokenId, currentNonce, deadline)
+        );
+        address signer = ECDSA.recoverCalldata(_hashTypedDataV4(structHash), signature);
+        if (signer != owner) {
+            revert InvalidPermitSigner(signer, owner);
+        }
+
+        unchecked {
+            _permitNonces[tokenId] = currentNonce + 1;
+        }
+        _approve(spender, tokenId, address(0));
     }
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
@@ -136,7 +181,10 @@ contract TicketNFT is ERC721, AccessControl, Pausable, IERC4906 {
     function supportsInterface(
         bytes4 interfaceId
     ) public view override(ERC721, AccessControl, IERC165) returns (bool) {
-        return interfaceId == type(IERC4906).interfaceId || super.supportsInterface(interfaceId);
+        return
+            interfaceId == type(IERC4906).interfaceId ||
+            interfaceId == type(IERC4494).interfaceId ||
+            super.supportsInterface(interfaceId);
     }
 
     function _update(
@@ -154,7 +202,14 @@ contract TicketNFT is ERC721, AccessControl, Pausable, IERC4906 {
             require(balanceOf(to) < maxPerWallet, "Wallet ticket limit reached");
         }
 
-        return super._update(to, tokenId, auth);
+        address previousOwner = super._update(to, tokenId, auth);
+        if (previousOwner != address(0) && previousOwner != to) {
+            unchecked {
+                _permitNonces[tokenId] += 1;
+            }
+        }
+
+        return previousOwner;
     }
 
     function _isMarkedUsed(uint256 tokenId) private view returns (bool) {

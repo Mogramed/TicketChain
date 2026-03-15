@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export * as interfaces from './interfaces/index.js';
+export { ChainTicketFactory__factory } from './ChainTicketFactory__factory.js';
 export { ChainTicketTimelock__factory } from './ChainTicketTimelock__factory.js';
 export { CheckInRegistry__factory } from './CheckInRegistry__factory.js';
 export { Marketplace__factory } from './Marketplace__factory.js';

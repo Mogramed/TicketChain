@@ -2,5 +2,6 @@
 /* tslint:disable */
 /* eslint-disable */
 export { ICheckInRegistry__factory } from './ICheckInRegistry__factory.js';
+export { IERC4494__factory } from './IERC4494__factory.js';
 export { ITicketNFT__factory } from './ITicketNFT__factory.js';
 export { ITicketSystemState__factory } from './ITicketSystemState__factory.js';

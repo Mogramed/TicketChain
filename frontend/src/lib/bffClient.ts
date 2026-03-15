@@ -1,5 +1,10 @@
 import type {
+  BackendHealthSnapshot,
   ChainTicketEvent,
+  OperationalActivity,
+  OperationalRoleAssignment,
+  OperationalSummary,
+  EventDeployment,
   MarketStats,
   MarketplaceView,
   SystemState,
@@ -58,6 +63,63 @@ interface BffTimelineEntryPayload {
   scanner?: string;
   priceWei?: string;
   feeAmountWei?: string;
+}
+
+interface BffEventDeploymentPayload {
+  ticketEventId: string;
+  name: string;
+  symbol: string;
+  primaryPriceWei: string;
+  maxSupply: string;
+  treasury: string;
+  admin: string;
+  ticketNftAddress: string;
+  marketplaceAddress: string;
+  checkInRegistryAddress: string;
+  deploymentBlock: number;
+  registeredAt: number;
+}
+
+interface BffOperationalRolePayload {
+  ticketEventId: string;
+  contractScope: OperationalRoleAssignment["contractScope"];
+  roleId: string;
+  account: string;
+  grantedBy: string | null;
+  isActive: boolean;
+  updatedBlock: number;
+  updatedTxHash: string;
+}
+
+interface BffOperationalActivityPayload {
+  id: string;
+  ticketEventId: string;
+  contractScope: OperationalActivity["contractScope"];
+  type: OperationalActivity["type"];
+  roleId: string | null;
+  account: string | null;
+  actor: string | null;
+  blockNumber: number;
+  txHash: string;
+  timestamp: number | null;
+}
+
+interface BffHealthPayload {
+  ok: boolean;
+  degraded: boolean;
+  checkedAt: number;
+  indexedBlock: number;
+  latestBlock: number | null;
+  lag: number | null;
+  stalenessMs: number | null;
+  rpcHealthy: boolean;
+  readModelReady: boolean;
+  configuredDeploymentBlock: number;
+  alerts: Array<{
+    code: string;
+    severity: "warning" | "critical";
+    message: string;
+  }>;
 }
 
 function toBigInt(value: string | null | undefined): bigint | null {
@@ -128,6 +190,88 @@ function parseTimeline(payload: BffTimelineEntryPayload[]): TicketTimelineEntry[
   }));
 }
 
+function parseEvents(payload: BffEventDeploymentPayload[]): EventDeployment[] {
+  return payload.map((item) => ({
+    ticketEventId: item.ticketEventId,
+    name: item.name,
+    symbol: item.symbol,
+    primaryPriceWei: item.primaryPriceWei,
+    maxSupply: item.maxSupply,
+    treasury: item.treasury,
+    admin: item.admin,
+    ticketNftAddress: item.ticketNftAddress,
+    marketplaceAddress: item.marketplaceAddress,
+    checkInRegistryAddress: item.checkInRegistryAddress,
+    deploymentBlock: item.deploymentBlock,
+    registeredAt: item.registeredAt,
+  }));
+}
+
+function parseOperationalSummary(payload: {
+  ticketEventId: string;
+  roles: BffOperationalRolePayload[];
+  recentActivity: BffOperationalActivityPayload[];
+}): OperationalSummary {
+  return {
+    ticketEventId: payload.ticketEventId,
+    roles: payload.roles.map((role) => ({
+      ticketEventId: role.ticketEventId,
+      contractScope: role.contractScope,
+      roleId: role.roleId,
+      account: role.account,
+      grantedBy: role.grantedBy,
+      isActive: role.isActive,
+      updatedBlock: role.updatedBlock,
+      updatedTxHash: role.updatedTxHash,
+    })),
+    recentActivity: payload.recentActivity.map((activity) => ({
+      id: activity.id,
+      ticketEventId: activity.ticketEventId,
+      contractScope: activity.contractScope,
+      type: activity.type,
+      roleId: activity.roleId ?? undefined,
+      account: activity.account ?? undefined,
+      actor: activity.actor ?? undefined,
+      blockNumber: activity.blockNumber,
+      txHash: activity.txHash,
+      timestamp: activity.timestamp,
+    })),
+  };
+}
+
+function parseHealth(payload: BffHealthPayload): BackendHealthSnapshot {
+  return {
+    ok: payload.ok,
+    degraded: payload.degraded,
+    checkedAt: payload.checkedAt,
+    indexedBlock: payload.indexedBlock,
+    latestBlock: payload.latestBlock,
+    lag: payload.lag,
+    stalenessMs: payload.stalenessMs,
+    rpcHealthy: payload.rpcHealthy,
+    readModelReady: payload.readModelReady,
+    configuredDeploymentBlock: payload.configuredDeploymentBlock,
+    alerts: payload.alerts.map((alert) => ({
+      code: alert.code,
+      severity: alert.severity,
+      message: alert.message,
+    })),
+  };
+}
+
+function buildQuery(params: Record<string, string | number | undefined>): string {
+  const query = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined) {
+      continue;
+    }
+    query.set(key, String(value));
+  }
+
+  return query.size > 0 ? `?${query.toString()}` : "";
+}
+
 function parseStreamEvent(payload: unknown): ChainTicketEvent | null {
   if (!payload || typeof payload !== "object") {
     return null;
@@ -135,6 +279,7 @@ function parseStreamEvent(payload: unknown): ChainTicketEvent | null {
 
   const value = payload as {
     type?: ChainTicketEvent["type"];
+    ticketEventId?: string;
     tokenId?: string;
     txHash?: string;
     blockNumber?: number;
@@ -146,6 +291,7 @@ function parseStreamEvent(payload: unknown): ChainTicketEvent | null {
 
   return {
     type: value.type,
+    ticketEventId: value.ticketEventId,
     tokenId: value.tokenId ? BigInt(value.tokenId) : undefined,
     txHash: value.txHash,
     blockNumber: value.blockNumber,
@@ -184,60 +330,84 @@ export class BffClient {
     }
   }
 
-  async health(): Promise<{ ok: boolean; indexedBlock?: number }> {
-    return this.fetchJson<{ ok: boolean; indexedBlock?: number }>("/v1/health");
+  async health(): Promise<BackendHealthSnapshot> {
+    const payload = await this.fetchJson<BffHealthPayload>("/v1/health");
+    return parseHealth(payload);
   }
 
-  async getSystemState(): Promise<SystemState> {
-    const payload = await this.fetchJson<BffSystemPayload>("/v1/system");
+  async listEvents(): Promise<{ items: EventDeployment[]; defaultEventId: string }> {
+    const payload = await this.fetchJson<{
+      items: BffEventDeploymentPayload[];
+      defaultEventId: string;
+    }>("/v1/events");
+
+    return {
+      items: parseEvents(payload.items),
+      defaultEventId: payload.defaultEventId,
+    };
+  }
+
+  async getSystemState(eventId?: string): Promise<SystemState> {
+    const payload = await this.fetchJson<BffSystemPayload>(
+      `/v1/system${buildQuery({ eventId })}`,
+    );
     return parseSystem(payload);
   }
 
   async getListings(options: {
+    eventId?: string;
     sort?: ListingSort;
     limit?: number;
     offset?: number;
   } = {}): Promise<MarketplaceView[]> {
-    const query = new URLSearchParams();
-    if (options.sort) {
-      query.set("sort", options.sort);
-    }
-    if (options.limit !== undefined) {
-      query.set("limit", String(options.limit));
-    }
-    if (options.offset !== undefined) {
-      query.set("offset", String(options.offset));
-    }
-
-    const suffix = query.size ? `?${query.toString()}` : "";
+    const suffix = buildQuery({
+      eventId: options.eventId,
+      sort: options.sort,
+      limit: options.limit,
+      offset: options.offset,
+    });
     const payload = await this.fetchJson<{ items: BffListingPayload[] }>(`/v1/listings${suffix}`);
     return parseListings(payload.items);
   }
 
-  async getMarketStats(): Promise<MarketStats> {
-    const payload = await this.fetchJson<BffMarketStatsPayload>("/v1/market/stats");
+  async getMarketStats(eventId?: string): Promise<MarketStats> {
+    const payload = await this.fetchJson<BffMarketStatsPayload>(
+      `/v1/market/stats${buildQuery({ eventId })}`,
+    );
     return parseStats(payload);
   }
 
-  async getUserTickets(address: string): Promise<TicketView[]> {
+  async getUserTickets(address: string, eventId?: string): Promise<TicketView[]> {
     const payload = await this.fetchJson<{ items: BffTicketPayload[] }>(
-      `/v1/users/${address}/tickets`,
+      `/v1/users/${address}/tickets${buildQuery({ eventId })}`,
     );
     return parseTickets(payload.items);
   }
 
-  async getTicketTimeline(tokenId: bigint): Promise<TicketTimelineEntry[]> {
+  async getTicketTimeline(tokenId: bigint, eventId?: string): Promise<TicketTimelineEntry[]> {
     const payload = await this.fetchJson<{ items: BffTimelineEntryPayload[] }>(
-      `/v1/tickets/${tokenId.toString()}/timeline`,
+      `/v1/tickets/${tokenId.toString()}/timeline${buildQuery({ eventId })}`,
     );
     return parseTimeline(payload.items);
+  }
+
+  async getOperationalSummary(eventId?: string): Promise<OperationalSummary> {
+    const payload = await this.fetchJson<{
+      ticketEventId: string;
+      roles: BffOperationalRolePayload[];
+      recentActivity: BffOperationalActivityPayload[];
+    }>(`/v1/ops/summary${buildQuery({ eventId })}`);
+    return parseOperationalSummary(payload);
   }
 
   watchEvents(
     onEvent: (event: ChainTicketEvent) => void,
     onError?: (error: unknown) => void,
+    eventId?: string,
   ): () => void {
-    const stream = new EventSource(`${this.baseUrl}/v1/events/stream`);
+    const stream = new EventSource(
+      `${this.baseUrl}/v1/events/stream${buildQuery({ eventId })}`,
+    );
 
     const messageHandler = (message: MessageEvent<string>) => {
       try {

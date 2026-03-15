@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useI18n } from "../../i18n/I18nContext";
-import { useAppState } from "../../state/AppStateContext";
+import { useAppState } from "../../state/useAppState";
 import { Badge, ButtonGroup, Panel, ProgressStepper } from "../ui/Primitives";
 
 export function OnboardingGuide() {

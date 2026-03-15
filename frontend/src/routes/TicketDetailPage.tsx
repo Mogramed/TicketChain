@@ -11,10 +11,11 @@ import {
   SectionHeader,
   Tag,
 } from "../components/ui/Primitives";
+import { IndexedReadinessBanner } from "../components/layout/IndexedReadinessBanner";
 import { useI18n } from "../i18n/I18nContext";
 import { formatAddress, formatTimestamp } from "../lib/format";
 import { parseTokenIdInput, timelineLabel } from "../lib/timeline";
-import { useAppState } from "../state/AppStateContext";
+import { useAppState } from "../state/useAppState";
 import type { TicketTimelineEntry } from "../types/chainticket";
 
 function phaseForEntry(entry: TicketTimelineEntry): string {
@@ -69,13 +70,13 @@ function phaseBadgeTone(entry: TicketTimelineEntry): "success" | "info" | "warni
 export function TicketDetailPage() {
   const { t } = useI18n();
   const { tokenId: tokenIdParam } = useParams<{ tokenId: string }>();
-  const { fetchTicketTimeline, contractConfig } = useAppState();
+  const { fetchTicketTimeline, contractConfig, indexedReadsAvailable } = useAppState();
 
   const tokenId = tokenIdParam ? parseTokenIdInput(tokenIdParam) : null;
 
   const timelineQuery = useQuery({
     queryKey: ["ticket-timeline", tokenId?.toString() ?? "none"],
-    enabled: tokenId !== null,
+    enabled: tokenId !== null && indexedReadsAvailable,
     queryFn: async () => {
       if (tokenId === null) {
         return [];
@@ -108,8 +109,16 @@ export function TicketDetailPage() {
       />
 
       {tokenId === null ? <EmptyState title="Invalid token" description="Token id format is not valid." /> : null}
-      {timelineQuery.isLoading ? <EmptyState title="Loading timeline" description={t("timelineLoading")} /> : null}
-      {!timelineQuery.isLoading && (timelineQuery.data?.length ?? 0) === 0 ? (
+      {tokenId !== null && !indexedReadsAvailable ? (
+        <IndexedReadinessBanner
+          title="Ticket timeline unavailable"
+          impact="The indexed timeline stays blocked until the BFF read model is ready for timeline queries."
+        />
+      ) : null}
+      {indexedReadsAvailable && timelineQuery.isLoading ? (
+        <EmptyState title="Loading timeline" description={t("timelineLoading")} />
+      ) : null}
+      {indexedReadsAvailable && !timelineQuery.isLoading && (timelineQuery.data?.length ?? 0) === 0 ? (
         <EmptyState
           title={t("emptyTimelineTitle")}
           description={t("emptyTimelineReason")}
@@ -122,7 +131,7 @@ export function TicketDetailPage() {
       ) : null}
 
       <Panel className="primary-panel">
-        {grouped.length > 0 ? (
+        {indexedReadsAvailable && grouped.length > 0 ? (
           <section className="phase-summary">
             <SectionHeader
               title="Lifecycle summary"
@@ -139,7 +148,8 @@ export function TicketDetailPage() {
         ) : null}
 
         <section className="timeline-list">
-          {(timelineQuery.data ?? []).map((entry) => (
+          {indexedReadsAvailable
+            ? (timelineQuery.data ?? []).map((entry) => (
             <Card key={entry.id} className="timeline-item">
               <div className="timeline-marker" aria-hidden="true" />
               <div className="timeline-content">
@@ -158,7 +168,8 @@ export function TicketDetailPage() {
                 </a>
               </div>
             </Card>
-          ))}
+              ))
+            : null}
         </section>
       </Panel>
     </div>

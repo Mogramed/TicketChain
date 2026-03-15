@@ -1,4 +1,4 @@
-import { useState, type HTMLAttributes, type ReactNode } from "react";
+import { useId, useRef, useState, type HTMLAttributes, type KeyboardEvent, type ReactNode } from "react";
 
 type Tone = "default" | "success" | "warning" | "danger" | "info";
 type RiskTone = "neutral" | "warning" | "error" | "success";
@@ -306,21 +306,67 @@ export function SegmentedToggle<T extends string>({
   value,
   onChange,
   className,
+  ariaLabel = "View mode",
 }: {
   options: Array<{ value: T; label: string }>;
   value: T;
   onChange: (next: T) => void;
   className?: string;
+  ariaLabel?: string;
 }) {
+  const tabListId = useId();
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const focusOption = (index: number) => {
+    optionRefs.current[index]?.focus();
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (options.length <= 1) {
+      return;
+    }
+
+    let nextIndex = index;
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        nextIndex = (index + 1) % options.length;
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        nextIndex = (index - 1 + options.length) % options.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = options.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    onChange(options[nextIndex]!.value);
+    focusOption(nextIndex);
+  };
+
   return (
-    <div className={joinClassName("ui-segmented", className)} role="tablist" aria-label="View mode">
-      {options.map((option) => (
+    <div className={joinClassName("ui-segmented", className)} role="tablist" aria-label={ariaLabel}>
+      {options.map((option, index) => (
         <button
           key={option.value}
           type="button"
           className={option.value === value ? "active" : undefined}
           onClick={() => onChange(option.value)}
-          aria-pressed={option.value === value}
+          onKeyDown={(event) => onKeyDown(event, index)}
+          role="tab"
+          id={`${tabListId}-${option.value}`}
+          aria-selected={option.value === value}
+          tabIndex={option.value === value ? 0 : -1}
+          ref={(node) => {
+            optionRefs.current[index] = node;
+          }}
         >
           {option.label}
         </button>

@@ -10,7 +10,7 @@ import {
 } from "../components/ui/Primitives";
 import { SafetyCockpit } from "../components/layout/SafetyCockpit";
 import { useI18n } from "../i18n/I18nContext";
-import { useAppState } from "../state/AppStateContext";
+import { useAppState } from "../state/useAppState";
 
 export function AdvancedHubPage() {
   const { t } = useI18n();

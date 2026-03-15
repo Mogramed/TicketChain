@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Signer } from "ethers";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Provider, Signer } from "ethers";
 
 import { mapEthersError } from "../../lib/errors";
 import { subscribeWalletLifecycle } from "../../lib/wallet";
@@ -15,7 +15,6 @@ interface WalletSessionArgs {
   clearMessages: () => void;
   setErrorMessage: (message: string) => void;
   setStatusMessage: (message: string) => void;
-  invalidateDashboard: () => void;
 }
 
 interface WalletSessionResult {
@@ -41,7 +40,6 @@ export function useWalletSession({
   clearMessages,
   setErrorMessage,
   setStatusMessage,
-  invalidateDashboard,
 }: WalletSessionArgs): WalletSessionResult {
   const [walletProviders, setWalletProviders] = useState<WalletProviderInfo[]>([]);
   const [selectedProviderId, setSelectedProviderId] = useState<string>("");
@@ -51,6 +49,9 @@ export function useWalletSession({
   const [walletClient, setWalletClient] = useState<ChainTicketClient | null>(null);
   const [userRoles, setUserRoles] = useState<UserRoles>(EMPTY_ROLES);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [walletSigner, setWalletSigner] = useState<Signer | null>(null);
+  const [walletReadProvider, setWalletReadProvider] = useState<Provider | null>(null);
+  const walletClientRef = useRef<ChainTicketClient | null>(null);
 
   const selectedProvider = useMemo(
     () =>
@@ -64,15 +65,20 @@ export function useWalletSession({
     setWalletAddress("");
     setWalletChainId(null);
     setWalletClient(null);
+    walletClientRef.current = null;
+    setWalletSigner(null);
+    setWalletReadProvider(null);
     setConnectedProvider(null);
     setUserRoles(EMPTY_ROLES);
   }, []);
 
   const loadUserRoles = useCallback(
-    async (address: string, preferredClient: ChainTicketClient | null = walletClient) => {
+    async (address: string, preferredClient: ChainTicketClient | null = null) => {
       const roleClient = preferredClient?.getUserRoles
         ? preferredClient
-        : readClient?.getUserRoles
+        : walletClientRef.current?.getUserRoles
+          ? walletClientRef.current
+          : readClient?.getUserRoles
           ? readClient
           : null;
 
@@ -88,7 +94,7 @@ export function useWalletSession({
         setUserRoles(EMPTY_ROLES);
       }
     },
-    [readClient, walletClient],
+    [readClient],
   );
 
   useEffect(() => {
@@ -142,7 +148,6 @@ export function useWalletSession({
         setWalletAddress(first);
         setStatusMessage("Wallet account changed.");
         void loadUserRoles(first);
-        invalidateDashboard();
       },
       onChainChanged: (chainId) => {
         setWalletChainId(chainId);
@@ -167,10 +172,30 @@ export function useWalletSession({
     connectedProvider,
     contractConfig.chainId,
     contractConfig.chainName,
-    invalidateDashboard,
     loadUserRoles,
     setErrorMessage,
     setStatusMessage,
+  ]);
+
+  useEffect(() => {
+    if (!walletSigner || !walletAddress) {
+      return;
+    }
+
+    const nextWalletClient = createClient(contractConfig, {
+      signer: walletSigner,
+      readProvider: walletReadProvider ?? undefined,
+    });
+    walletClientRef.current = nextWalletClient;
+    setWalletClient(nextWalletClient);
+    void loadUserRoles(walletAddress, nextWalletClient);
+  }, [
+    contractConfig,
+    createClient,
+    loadUserRoles,
+    walletAddress,
+    walletReadProvider,
+    walletSigner,
   ]);
 
   const disconnectWallet = useCallback(() => {
@@ -192,16 +217,9 @@ export function useWalletSession({
       setWalletAddress(connected.address);
       setWalletChainId(connected.chainId);
       setConnectedProvider(connected.providerInfo);
-
-      const nextWalletClient = createClient(contractConfig, {
-        signer: connected.signer as Signer,
-      });
-
-      setWalletClient(nextWalletClient);
-      await loadUserRoles(connected.address, nextWalletClient);
-
+      setWalletSigner(connected.signer as Signer);
+      setWalletReadProvider(connected.provider);
       setStatusMessage(`Connected ${connected.providerInfo.name} on chain ${connected.chainId}.`);
-      invalidateDashboard();
     } catch (error) {
       setErrorMessage(mapEthersError(error));
     } finally {
@@ -210,10 +228,7 @@ export function useWalletSession({
   }, [
     clearMessages,
     contractConfig,
-    createClient,
     hasValidConfig,
-    invalidateDashboard,
-    loadUserRoles,
     selectedProvider,
     setErrorMessage,
     setStatusMessage,

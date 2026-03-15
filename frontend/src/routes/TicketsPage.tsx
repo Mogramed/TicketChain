@@ -12,17 +12,29 @@ import {
   SectionHeader,
   SegmentedToggle,
 } from "../components/ui/Primitives";
+import { IndexedReadinessBanner } from "../components/layout/IndexedReadinessBanner";
 import { useI18n } from "../i18n/I18nContext";
 import { formatAddress } from "../lib/format";
-import { useAppState } from "../state/AppStateContext";
+import { useAppState } from "../state/useAppState";
 
 type TicketViewMode = "card" | "table";
 
 export function TicketsPage() {
   const { t } = useI18n();
-  const { tickets, walletAddress, watchlist, toggleWatch, refreshDashboard, uiMode, connectWallet } =
-    useAppState();
+  const {
+    tickets,
+    walletAddress,
+    watchlist,
+    toggleWatch,
+    refreshDashboard,
+    uiMode,
+    connectWallet,
+    contractConfig,
+    indexedReadsAvailable,
+  } = useAppState();
   const [viewMode, setViewMode] = useState<TicketViewMode>("card");
+  const eventWatchKey = (tokenId: bigint) =>
+    `${contractConfig.eventId ?? "main-event"}:${tokenId.toString()}`;
 
   const sortedTickets = useMemo(
     () => [...tickets].sort((left, right) => (left.tokenId > right.tokenId ? -1 : 1)),
@@ -92,7 +104,14 @@ export function TicketsPage() {
         />
       ) : null}
 
-      {walletAddress && sortedTickets.length === 0 ? (
+      {walletAddress && !indexedReadsAvailable ? (
+        <IndexedReadinessBanner
+          title="Ticket inventory unavailable"
+          impact="Owned ticket inventory and timeline entry points stay blocked until the BFF read model is ready."
+        />
+      ) : null}
+
+      {walletAddress && indexedReadsAvailable && sortedTickets.length === 0 ? (
         <EmptyState
           title={t("emptyTicketsTitle")}
           description={t("emptyTicketsReason")}
@@ -104,7 +123,7 @@ export function TicketsPage() {
         />
       ) : null}
 
-      {walletAddress && sortedTickets.length > 0 ? (
+      {walletAddress && indexedReadsAvailable && sortedTickets.length > 0 ? (
         <SectionHeader
           title={t("ticketsOwnedTitle")}
           subtitle={t("ticketsOwnedSubtitle")}
@@ -112,7 +131,7 @@ export function TicketsPage() {
         />
       ) : null}
 
-      {viewMode === "card" ? (
+      {walletAddress && indexedReadsAvailable && viewMode === "card" ? (
         <section className="ticket-grid">
           {sortedTickets.map((ticket) => (
             <Card key={ticket.tokenId.toString()} className="ticket-card pass-card">
@@ -135,13 +154,13 @@ export function TicketsPage() {
                   {t("viewTimeline")}
                 </Link>
                 <button type="button" className="ghost" onClick={() => toggleWatch(ticket.tokenId)}>
-                  {watchlist.has(ticket.tokenId.toString()) ? t("unwatch") : t("watch")}
+                  {watchlist.has(eventWatchKey(ticket.tokenId)) ? t("unwatch") : t("watch")}
                 </button>
               </ButtonGroup>
             </Card>
           ))}
         </section>
-      ) : (
+      ) : walletAddress && indexedReadsAvailable ? (
         <Panel className="tickets-table-panel">
           <table className="market-table">
             <thead>
@@ -166,7 +185,7 @@ export function TicketsPage() {
                         {t("viewTimeline")}
                       </Link>
                       <button type="button" className="ghost" onClick={() => toggleWatch(ticket.tokenId)}>
-                        {watchlist.has(ticket.tokenId.toString()) ? t("unwatch") : t("watch")}
+                        {watchlist.has(eventWatchKey(ticket.tokenId)) ? t("unwatch") : t("watch")}
                       </button>
                     </ButtonGroup>
                   </td>
@@ -175,7 +194,7 @@ export function TicketsPage() {
             </tbody>
           </table>
         </Panel>
-      )}
+      ) : null}
 
       <DetailAccordion
         title="Ticket status guide"

@@ -1,7 +1,9 @@
 import type { ChainTicketClientOptions } from "../../lib/chainTicketClient";
 import type {
+  BackendHealthSnapshot,
   ChainTicketClient,
   ContractConfig,
+  EventDeployment,
   MarketplaceView,
   PendingPreview,
   PreflightAction,
@@ -17,7 +19,7 @@ import type {
 } from "../../types/chainticket";
 import type { ConnectedWallet } from "../../lib/wallet";
 
-export type BffMode = "disabled" | "probing" | "online" | "offline";
+export type BffMode = "disabled" | "probing" | "online" | "degraded" | "offline";
 
 export type ClientFactory = (
   config: ContractConfig,
@@ -40,6 +42,14 @@ export interface PreparePreviewPayload {
 export interface AppStateContextValue {
   contractConfig: ContractConfig;
   runtimeConfig: RuntimeConfig;
+  availableEvents: EventDeployment[];
+  selectedEventId: string;
+  setSelectedEventId: (eventId: string) => void;
+  selectedEventName: string;
+  bffSupportsSelectedEvent: boolean;
+  bffHealth: BackendHealthSnapshot | null;
+  indexedReadsAvailable: boolean;
+  indexedReadsIssue: string | null;
   hasValidConfig: boolean;
   configIssues: string[];
   walletProviders: WalletProviderInfo[];

@@ -6,7 +6,7 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 
   export interface TicketNFTInterface extends Interface {
-    getFunction(nameOrSignature: "DEFAULT_ADMIN_ROLE" | "DOMAIN_SEPARATOR" | "PAUSER_ROLE" | "PERMIT_TYPEHASH" | "approve" | "balanceOf" | "checkInRegistry" | "collectibleMode" | "eip712Domain" | "getApproved" | "getRoleAdmin" | "grantRole" | "hasRole" | "isApprovedForAll" | "isUsed" | "marketplace" | "maxPerWallet" | "maxSupply" | "mintPrimary" | "name" | "nonces" | "ownerOf" | "pause" | "paused" | "permit" | "primaryPrice" | "renounceRole" | "revokeRole" | "safeTransferFrom(address,address,uint256)" | "safeTransferFrom(address,address,uint256,bytes)" | "setApprovalForAll" | "setBaseUris" | "setCheckInRegistry" | "setCollectibleMode" | "setMarketplace" | "supportsInterface" | "symbol" | "tokenURI" | "totalMinted" | "transferFrom" | "treasury" | "unpause"): FunctionFragment;
+    getFunction(nameOrSignature: "DEFAULT_ADMIN_ROLE" | "DOMAIN_SEPARATOR" | "PAUSER_ROLE" | "PERMIT_TYPEHASH" | "approve" | "balanceOf" | "baseUris" | "checkInRegistry" | "collectibleMode" | "eip712Domain" | "getApproved" | "getRoleAdmin" | "grantRole" | "hasRole" | "isApprovedForAll" | "isUsed" | "marketplace" | "maxPerWallet" | "maxSupply" | "mintPrimary" | "name" | "nonces" | "ownerOf" | "pause" | "paused" | "permit" | "primaryPrice" | "renounceRole" | "revokeRole" | "safeTransferFrom(address,address,uint256)" | "safeTransferFrom(address,address,uint256,bytes)" | "setApprovalForAll" | "setBaseUris" | "setCheckInRegistry" | "setCollectibleMode" | "setMarketplace" | "supportsInterface" | "symbol" | "tokenURI" | "totalMinted" | "transferFrom" | "treasury" | "unpause"): FunctionFragment;
 
     getEvent(nameOrSignatureOrTopic: "Approval" | "ApprovalForAll" | "BaseUrisUpdated" | "BatchMetadataUpdate" | "CheckInRegistryUpdated" | "CollectibleModeUpdated" | "EIP712DomainChanged" | "MarketplaceUpdated" | "MetadataUpdate" | "Paused" | "PrimaryMinted" | "RoleAdminChanged" | "RoleGranted" | "RoleRevoked" | "Transfer" | "Unpaused"): EventFragment;
 
@@ -16,6 +16,7 @@ encodeFunctionData(functionFragment: 'PAUSER_ROLE', values?: undefined): string;
 encodeFunctionData(functionFragment: 'PERMIT_TYPEHASH', values?: undefined): string;
 encodeFunctionData(functionFragment: 'approve', values: [AddressLike, BigNumberish]): string;
 encodeFunctionData(functionFragment: 'balanceOf', values: [AddressLike]): string;
+encodeFunctionData(functionFragment: 'baseUris', values?: undefined): string;
 encodeFunctionData(functionFragment: 'checkInRegistry', values?: undefined): string;
 encodeFunctionData(functionFragment: 'collectibleMode', values?: undefined): string;
 encodeFunctionData(functionFragment: 'eip712Domain', values?: undefined): string;
@@ -59,6 +60,7 @@ decodeFunctionResult(functionFragment: 'PAUSER_ROLE', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'PERMIT_TYPEHASH', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'approve', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'balanceOf', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'baseUris', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'checkInRegistry', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'collectibleMode', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'eip712Domain', data: BytesLike): Result;
@@ -367,6 +369,14 @@ decodeFunctionResult(functionFragment: 'unpause', data: BytesLike): Result;
     balanceOf: TypedContractMethod<
       [owner: AddressLike, ],
       [bigint],
+      'view'
+    >
+    
+
+    
+    baseUris: TypedContractMethod<
+      [],
+      [[string, string] & {baseTokenURI: string, collectibleBaseURI: string }],
       'view'
     >
     
@@ -690,6 +700,11 @@ getFunction(nameOrSignature: 'approve'): TypedContractMethod<
 getFunction(nameOrSignature: 'balanceOf'): TypedContractMethod<
       [owner: AddressLike, ],
       [bigint],
+      'view'
+    >;
+getFunction(nameOrSignature: 'baseUris'): TypedContractMethod<
+      [],
+      [[string, string] & {baseTokenURI: string, collectibleBaseURI: string }],
       'view'
     >;
 getFunction(nameOrSignature: 'checkInRegistry'): TypedContractMethod<

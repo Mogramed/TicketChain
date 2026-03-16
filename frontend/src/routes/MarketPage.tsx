@@ -15,6 +15,7 @@ import {
   SegmentedToggle,
   Tag,
 } from "../components/ui/Primitives";
+import { EventDemoNotice } from "../components/events/EventDemoNotice";
 import { IndexedReadinessBanner } from "../components/layout/IndexedReadinessBanner";
 import { useI18n } from "../i18n/I18nContext";
 import { formatAddress, formatPol, parsePolInput } from "../lib/format";
@@ -46,7 +47,11 @@ export function MarketPage() {
     uiMode,
     pendingPreview,
     indexedReadsAvailable,
+    availableEvents,
+    selectedEventId,
   } = useAppState();
+  const selectedEvent =
+    availableEvents.find((event) => event.ticketEventId === selectedEventId) ?? null;
   const eventWatchKey = (tokenId: bigint) =>
     `${contractConfig.eventId ?? "main-event"}:${tokenId.toString()}`;
 
@@ -233,6 +238,8 @@ export function MarketPage() {
           </ButtonGroup>
         }
       />
+
+      <EventDemoNotice event={selectedEvent} />
 
       <Panel className="primary-panel">
         <ActionBar

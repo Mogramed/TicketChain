@@ -170,6 +170,7 @@ describe("App route-based smoke", () => {
     );
 
     const user = userEvent.setup();
+    await screen.findByTestId("fan-page", {}, { timeout: 5_000 });
 
     const connectButtons = await screen.findAllByRole("button", {
       name: /Connect Wallet|Connecter le wallet|Connect wallet/i,

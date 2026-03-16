@@ -323,21 +323,24 @@ export function AppStateProvider({
 
   const fetchTicketTimeline = useCallback(
     async (tokenId: bigint): Promise<TicketTimelineEntry[]> => {
-      if (!readClient) {
+      if (!readClient && !bffClient) {
         return [];
       }
 
-      if (bffClient) {
-        if (!indexedReadsAvailable) {
-          return [];
-        }
-
+      if (bffClient && indexedReadsAvailable) {
         return fetchWithFallback(
           bffSupportsSelectedEvent
             ? () => bffClient.getTicketTimeline(tokenId, selectedEvent.ticketEventId)
             : null,
-          () => Promise.resolve([] as TicketTimelineEntry[]),
+          () =>
+            readClient
+              ? readClient.getTicketTimeline(tokenId)
+              : Promise.resolve([] as TicketTimelineEntry[]),
         );
+      }
+
+      if (!readClient) {
+        return [];
       }
 
       return fetchWithFallback(null, () => readClient.getTicketTimeline(tokenId));

@@ -28,6 +28,21 @@ export function formatTimestamp(timestamp: number): string {
   return new Date(timestamp).toLocaleString();
 }
 
+export function formatEventStart(timestamp: number | null | undefined): string {
+  if (!timestamp) {
+    return "Date to be announced";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+}
+
 export function remainingSupply(maxSupply: bigint, totalMinted: bigint): bigint {
   const remaining = maxSupply - totalMinted;
   return remaining > 0n ? remaining : 0n;

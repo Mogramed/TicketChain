@@ -110,7 +110,11 @@ export function useDashboardQueries({
   const fetchWithFallback = useCallback(
     async <T,>(fromBff: (() => Promise<T>) | null, fromRpc: () => Promise<T>): Promise<T> => {
       if (fromBff) {
-        return fromBff();
+        try {
+          return await fromBff();
+        } catch {
+          return fromRpc();
+        }
       }
 
       return fromRpc();
@@ -126,16 +130,21 @@ export function useDashboardQueries({
       runtimeConfig.apiBaseUrl,
       bffReadEnabled,
     ],
-    enabled: hasConfiguredBff ? Boolean(canReadSystemFromBff) : Boolean(readClient),
+    enabled: hasConfiguredBff ? Boolean(canReadSystemFromBff || readClient) : Boolean(readClient),
     retry: 0,
     refetchInterval: hasConfiguredBff && canReadSystemFromBff ? 60_000 : false,
     queryFn: async () => {
-      if (hasConfiguredBff) {
-        if (!bffClient || !canReadSystemFromBff) {
-          throw new Error("BFF system state is unavailable until the read model is ready.");
-        }
+      if (hasConfiguredBff && bffClient && canReadSystemFromBff) {
+        return fetchWithFallback(
+          () => bffClient.getSystemState(contractConfig.eventId),
+          () => {
+            if (!readClient) {
+              throw new Error("Invalid contract config for system state.");
+            }
 
-        return bffClient.getSystemState(contractConfig.eventId);
+            return readClient.getSystemState();
+          },
+        );
       }
 
       if (!readClient) {
@@ -155,15 +164,11 @@ export function useDashboardQueries({
       bffReadEnabled,
       effectiveBffMode,
     ],
-    enabled: hasConfiguredBff ? indexedReadsAvailable : Boolean(readClient),
+    enabled: hasConfiguredBff ? Boolean(indexedReadsAvailable || readClient) : Boolean(readClient),
     retry: 0,
     refetchInterval: canPollRemoteCatalog ? 25_000 : false,
     queryFn: async () => {
-      if (hasConfiguredBff) {
-        if (!bffClient || !indexedReadsAvailable) {
-          throw new Error("BFF listings are unavailable until the read model is ready.");
-        }
-
+      if (hasConfiguredBff && bffClient && indexedReadsAvailable) {
         return fetchWithFallback(
           () =>
             bffClient.getListings({
@@ -171,7 +176,13 @@ export function useDashboardQueries({
               sort: "recent",
               limit: 200,
             }),
-          () => Promise.resolve([] as MarketplaceView[]),
+          () => {
+            if (!readClient) {
+              return Promise.resolve([] as MarketplaceView[]);
+            }
+
+            return readClient.getListings();
+          },
         );
       }
 
@@ -192,16 +203,21 @@ export function useDashboardQueries({
       bffReadEnabled,
       effectiveBffMode,
     ],
-    enabled: hasConfiguredBff ? indexedReadsAvailable : Boolean(readClient),
+    enabled: hasConfiguredBff ? Boolean(indexedReadsAvailable || readClient) : Boolean(readClient),
     retry: 0,
     refetchInterval: canPollRemoteCatalog ? 25_000 : false,
     queryFn: async () => {
-      if (hasConfiguredBff) {
-        if (!bffClient || !indexedReadsAvailable) {
-          throw new Error("BFF market stats are unavailable until the read model is ready.");
-        }
+      if (hasConfiguredBff && bffClient && indexedReadsAvailable) {
+        return fetchWithFallback(
+          () => bffClient.getMarketStats(contractConfig.eventId),
+          () => {
+            if (!readClient) {
+              throw new Error("Market stats are unavailable.");
+            }
 
-        return bffClient.getMarketStats(contractConfig.eventId);
+            return readClient.getMarketStats();
+          },
+        );
       }
 
       if (!readClient) {
@@ -223,42 +239,39 @@ export function useDashboardQueries({
       effectiveBffMode,
     ],
     enabled: hasConfiguredBff
-      ? Boolean(walletAddress && indexedReadsAvailable && canReadFromBff)
+      ? Boolean(walletAddress && (indexedReadsAvailable || readClient || canReadFromBff))
       : Boolean(readClient && walletAddress),
     retry: 0,
     refetchInterval: walletAddress && canPollRemoteCatalog ? 25_000 : false,
     queryFn: async () => {
-      if (!readClient || !walletAddress) {
+      if (!walletAddress) {
         return [];
       }
 
-      if (hasConfiguredBff) {
-        if (!bffClient || !indexedReadsAvailable) {
-          throw new Error("BFF tickets are unavailable until the read model is ready.");
-        }
-
+      if (hasConfiguredBff && bffClient && indexedReadsAvailable) {
         return fetchWithFallback(
           () => bffClient.getUserTickets(walletAddress, contractConfig.eventId),
-          () => Promise.resolve([] as TicketView[]),
+          () => {
+            if (!readClient) {
+              return Promise.resolve([] as TicketView[]);
+            }
+
+            return readClient.getMyTickets(walletAddress);
+          },
         );
+      }
+
+      if (!readClient) {
+        return [];
       }
 
       return fetchWithFallback(null, () => readClient.getMyTickets(walletAddress));
     },
   });
 
-  const listings = useMemo(
-    () => (hasConfiguredBff && !indexedReadsAvailable ? [] : listingsQuery.data ?? []),
-    [hasConfiguredBff, indexedReadsAvailable, listingsQuery.data],
-  );
-  const tickets = useMemo(
-    () => (hasConfiguredBff && !indexedReadsAvailable ? [] : ticketsQuery.data ?? []),
-    [hasConfiguredBff, indexedReadsAvailable, ticketsQuery.data],
-  );
-  const systemState =
-    hasConfiguredBff && !canReadSystemFromBff
-      ? null
-      : systemQuery.data ?? null;
+  const listings = useMemo(() => listingsQuery.data ?? [], [listingsQuery.data]);
+  const tickets = useMemo(() => ticketsQuery.data ?? [], [ticketsQuery.data]);
+  const systemState = systemQuery.data ?? null;
   const derivedMarketStats = useMemo(
     () =>
       listings.length > 0
@@ -283,9 +296,7 @@ export function useDashboardQueries({
     systemState,
     listings,
     marketStats:
-      hasConfiguredBff && !indexedReadsAvailable
-        ? null
-        : marketStatsQuery.data ?? derivedMarketStats,
+      marketStatsQuery.data ?? derivedMarketStats,
     tickets,
     shouldRefetchRemoteMarketStats: Boolean(
       (hasConfiguredBff && effectiveBffMode === "online") || (!hasConfiguredBff && readClient),

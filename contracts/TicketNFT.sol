@@ -128,6 +128,10 @@ contract TicketNFT is ERC721, AccessControl, EIP712, Pausable, IERC4906, IERC449
         return _nextTokenId;
     }
 
+    function baseUris() external view returns (string memory baseTokenURI, string memory collectibleBaseURI) {
+        return (_baseTokenURI, _collectibleBaseURI);
+    }
+
     function DOMAIN_SEPARATOR() external view returns (bytes32) {
         return _domainSeparatorV4();
     }

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 
 import { useI18n } from "../../i18n/I18nContext";
-import { formatAddress } from "../../lib/format";
+import { formatAddress, formatEventStart } from "../../lib/format";
 import { useAppState } from "../../state/useAppState";
+import { EventDemoNotice } from "../events/EventDemoNotice";
+import { EventPoster } from "../events/EventPoster";
 import {
   Badge,
   ButtonGroup,
@@ -19,7 +21,8 @@ import { TransactionPreviewDrawer } from "./TransactionPreviewDrawer";
 interface NavigationItem {
   to: string;
   label: string;
-  glyph: string;
+  eyebrow: string;
+  description: string;
 }
 
 function useIsMobileBreakpoint(maxWidth: number): boolean {
@@ -106,12 +109,39 @@ export function AppLayout() {
 
   const navigation = useMemo<NavigationItem[]>(
     () => [
-      { to: "/app/fan", label: t("navBuy"), glyph: "A" },
-      { to: "/app/market", label: t("navResale"), glyph: "R" },
-      { to: "/app/tickets", label: t("navMyTickets"), glyph: "T" },
-      { to: "/app/advanced", label: t("navAdvanced"), glyph: "X" },
+      {
+        to: "/app/fan",
+        label: t("navBuy"),
+        eyebrow: "Primary",
+        description: "Mint the first-party pass with preflight checks.",
+      },
+      {
+        to: "/app/market",
+        label: t("navResale"),
+        eyebrow: "Marketplace",
+        description: "Explore capped resale inventory with transparent pricing.",
+      },
+      {
+        to: "/app/tickets",
+        label: t("navMyTickets"),
+        eyebrow: "Wallet",
+        description: "Open the pass, QR entry, and collectible preview.",
+      },
+      {
+        to: "/app/advanced",
+        label: t("navAdvanced"),
+        eyebrow: "Operations",
+        description: "Scanner, organizer controls, and advanced diagnostics.",
+      },
     ],
     [t],
+  );
+  const selectedEvent = useMemo(
+    () =>
+      availableEvents.find((event) => event.ticketEventId === selectedEventId) ??
+      availableEvents[0] ??
+      null,
+    [availableEvents, selectedEventId],
   );
 
   const walletStatusTone = walletChainId === contractConfig.chainId ? "success" : "warning";
@@ -131,7 +161,7 @@ export function AppLayout() {
             <div className="arena-brand">
               <p>{t("appEyebrow")}</p>
               <h1>ChainTicket</h1>
-              <span>Live Arena Edition</span>
+              <span>Investor demo for modern ticketing and collectibles</span>
             </div>
 
             <nav className="arena-rail-nav">
@@ -143,10 +173,11 @@ export function AppLayout() {
                     isActive ? "rail-link active" : "rail-link"
                   }
                 >
-                  <span className="rail-glyph" aria-hidden="true">
-                    {item.glyph}
-                  </span>
-                  <span>{item.label}</span>
+                  <div className="rail-link-copy">
+                    <small>{item.eyebrow}</small>
+                    <strong>{item.label}</strong>
+                    <span>{item.description}</span>
+                  </div>
                 </NavLink>
               ))}
             </nav>
@@ -171,26 +202,13 @@ export function AppLayout() {
                   ? t("networkSecure", { chainName: contractConfig.chainName })
                   : t("networkNotConnected")}
               </Badge>
+              <Tag tone="default">{contractConfig.eventName ?? contractConfig.eventId ?? "Event"}</Tag>
               <span className="utility-wallet">
                 {walletAddress ? formatAddress(walletAddress, 6) : t("networkNotConnected")}
               </span>
             </div>
 
             <ButtonGroup compact>
-              {availableEvents.length > 1 ? (
-                <select
-                  className="wallet-select"
-                  value={selectedEventId}
-                  onChange={(event) => setSelectedEventId(event.target.value)}
-                  aria-label="Ticket event"
-                >
-                  {availableEvents.map((event) => (
-                    <option key={event.ticketEventId} value={event.ticketEventId}>
-                      {event.name}
-                    </option>
-                  ))}
-                </select>
-              ) : null}
               <select
                 className="wallet-select"
                 value={selectedProviderId}
@@ -233,20 +251,76 @@ export function AppLayout() {
             </ButtonGroup>
           </header>
 
-          <section className="critical-strip" role="status" aria-live="polite">
-            <Tag tone="default">Event: {contractConfig.eventName ?? contractConfig.eventId ?? "-"}</Tag>
-            <Tag tone={systemState?.paused ? "danger" : "success"}>
-              {t("systemPause")}: {systemState?.paused ? t("enabled") : t("disabled")}
-            </Tag>
-            <Tag tone={systemState?.collectibleMode ? "info" : "default"}>
-              {t("collectibleMode")}: {systemState?.collectibleMode ? t("enabled") : t("disabled")}
-            </Tag>
-            <Tag tone="info">
-              {t("walletCapRemaining")}:{" "}
-              {walletCapRemaining !== null ? walletCapRemaining.toString() : "-"}
-            </Tag>
-            <Tag tone="default">Mode: {uiMode === "guide" ? t("uiModeGuide") : t("uiModeAdvanced")}</Tag>
+          <section className="experience-banner" role="status" aria-live="polite">
+            <div className="experience-banner-copy">
+              <p className="global-guide-eyebrow">Event spotlight</p>
+              <h2>{selectedEvent?.name ?? contractConfig.eventName ?? contractConfig.eventId ?? "ChainTicket event"}</h2>
+              <p>
+                Ticketing confidence inspired by modern mobile entry flows, with a collectible reveal
+                narrative layered on top of the NFT.
+              </p>
+              <div className="experience-banner-facts">
+                <strong>{formatEventStart(selectedEvent?.startsAt)}</strong>
+                <span>
+                  {[selectedEvent?.venueName, selectedEvent?.city, selectedEvent?.countryCode]
+                    .filter(Boolean)
+                    .join(" · ") || selectedEvent?.ticketEventId || "ChainTicket live event"}
+                </span>
+                {selectedEvent?.category ? <span>{selectedEvent.category}</span> : null}
+              </div>
+            </div>
+            <div className="experience-banner-meta">
+              <Tag tone={systemState?.paused ? "danger" : "success"}>
+                {t("systemPause")}: {systemState?.paused ? t("enabled") : t("disabled")}
+              </Tag>
+              <Tag tone={systemState?.collectibleMode ? "info" : "default"}>
+                {t("collectibleMode")}: {systemState?.collectibleMode ? t("enabled") : t("disabled")}
+              </Tag>
+              <Tag tone="info">
+                {t("walletCapRemaining")}:{" "}
+                {walletCapRemaining !== null ? walletCapRemaining.toString() : "-"}
+              </Tag>
+              <Tag tone="default">Mode: {uiMode === "guide" ? t("uiModeGuide") : t("uiModeAdvanced")}</Tag>
+              <Link to="/app/tickets" className="button-link ghost compact-link">
+                Open passes
+              </Link>
+            </div>
+            {selectedEvent ? (
+              <div className="experience-banner-visual">
+                <EventPoster event={selectedEvent} className="experience-poster" />
+              </div>
+            ) : null}
           </section>
+
+          <EventDemoNotice event={selectedEvent} compact />
+
+          {availableEvents.length > 1 ? (
+            <section className="event-switcher" aria-label="Available events">
+              {availableEvents.map((event) => (
+                <button
+                  key={event.ticketEventId}
+                  type="button"
+                  className={
+                    event.ticketEventId === selectedEventId
+                      ? "event-switch-card active"
+                      : "event-switch-card"
+                  }
+                  onClick={() => setSelectedEventId(event.ticketEventId)}
+                >
+                  <EventPoster event={event} className="event-switch-poster" />
+                  <div className="event-switch-copy">
+                    <span>{event.symbol}</span>
+                    <strong>{event.name}</strong>
+                    <small>{formatEventStart(event.startsAt)}</small>
+                    <small>
+                      {[event.city, event.countryCode].filter(Boolean).join(", ") || event.ticketEventId}
+                    </small>
+                    <em>{event.category ?? event.ticketEventId}</em>
+                  </div>
+                </button>
+              ))}
+            </section>
+          ) : null}
 
           <GlobalGuideBar />
 
@@ -287,7 +361,7 @@ export function AppLayout() {
         </main>
       </div>
 
-      {isMobile ? (
+          {isMobile ? (
         <nav className="bottom-nav" aria-label="Primary mobile navigation">
           {navigation.map((item) => (
             <NavLink
@@ -296,7 +370,7 @@ export function AppLayout() {
               className={({ isActive }) => (isActive ? "bottom-link active" : "bottom-link")}
             >
               <span className="bottom-glyph" aria-hidden="true">
-                {item.glyph}
+                {item.eyebrow.slice(0, 1)}
               </span>
               <span>{item.label}</span>
             </NavLink>

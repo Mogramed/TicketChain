@@ -12,33 +12,10 @@ import {
   RiskBanner,
 } from "../components/ui/Primitives";
 import { useI18n } from "../i18n/I18nContext";
+import { extractTokenId } from "../lib/scannerToken";
 import { useTicketScanner } from "../lib/scanner";
 import { parseTokenIdInput } from "../lib/timeline";
 import { useAppState } from "../state/useAppState";
-
-function extractTokenId(rawValue: string): string | null {
-  const trimmed = rawValue.trim();
-  if (!trimmed.length) {
-    return null;
-  }
-
-  if (/^\d+$/.test(trimmed)) {
-    return trimmed;
-  }
-
-  const fromQuery = trimmed.match(/[?&]tokenId=(\d+)/i);
-  if (fromQuery?.[1]) {
-    return fromQuery[1];
-  }
-
-  const fromPath = trimmed.match(/\/(\d+)(?:\D*)$/);
-  if (fromPath?.[1]) {
-    return fromPath[1];
-  }
-
-  const firstDigits = trimmed.match(/(\d{1,})/);
-  return firstDigits?.[1] ?? null;
-}
 
 function scannerModeLabel(mode: "native" | "fallback" | "manual"): string {
   if (mode === "native") {

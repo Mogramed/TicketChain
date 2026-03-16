@@ -2,6 +2,7 @@ import { Pool, type PoolClient } from "pg";
 
 import { config } from "./config.js";
 import { logger } from "./logger.js";
+import type { DemoCatalogEntry, DemoLineupStatus } from "./types.js";
 
 export const pool = new Pool({
   connectionString: config.databaseUrl,
@@ -172,6 +173,35 @@ CREATE TABLE IF NOT EXISTS role_state_items (
 
 CREATE INDEX IF NOT EXISTS role_state_items_ticket_role_idx
   ON role_state_items (ticket_event_id, contract_scope, role_id, is_active, account);
+
+CREATE TABLE IF NOT EXISTS demo_event_catalog (
+  lineup_status TEXT NOT NULL,
+  slot_index INTEGER NOT NULL,
+  ticket_event_id TEXT NOT NULL,
+  source TEXT NOT NULL,
+  source_event_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  starts_at BIGINT,
+  venue_name TEXT,
+  city TEXT,
+  country_code TEXT,
+  image_url TEXT,
+  category TEXT,
+  source_url TEXT,
+  fetched_at BIGINT NOT NULL,
+  expires_at BIGINT NOT NULL,
+  demo_disclaimer TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (lineup_status, slot_index),
+  CONSTRAINT demo_event_catalog_status_check
+    CHECK (lineup_status IN ('active', 'staged'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS demo_event_catalog_status_event_idx
+  ON demo_event_catalog (lineup_status, ticket_event_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS demo_event_catalog_status_source_idx
+  ON demo_event_catalog (lineup_status, source_event_id);
 `;
 
 export async function initDatabase(): Promise<void> {
@@ -353,4 +383,70 @@ export async function getEventDeployments(): Promise<EventDeploymentRow[]> {
   );
 
   return result.rows;
+}
+
+export async function replaceDemoCatalogEntries(
+  client: PoolClient,
+  lineupStatus: DemoLineupStatus,
+  entries: DemoCatalogEntry[],
+): Promise<void> {
+  await client.query("DELETE FROM demo_event_catalog WHERE lineup_status = $1", [lineupStatus]);
+
+  for (const entry of entries) {
+    await client.query(
+      `
+        INSERT INTO demo_event_catalog (
+          lineup_status,
+          slot_index,
+          ticket_event_id,
+          source,
+          source_event_id,
+          name,
+          starts_at,
+          venue_name,
+          city,
+          country_code,
+          image_url,
+          category,
+          source_url,
+          fetched_at,
+          expires_at,
+          demo_disclaimer
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+        )
+      `,
+      [
+        lineupStatus,
+        entry.slotIndex,
+        entry.ticketEventId,
+        entry.source,
+        entry.sourceEventId,
+        entry.name,
+        entry.startsAt,
+        entry.venueName,
+        entry.city,
+        entry.countryCode,
+        entry.imageUrl,
+        entry.category,
+        entry.sourceUrl,
+        entry.fetchedAt,
+        entry.expiresAt,
+        entry.demoDisclaimer,
+      ],
+    );
+  }
+}
+
+export async function promoteStagedDemoCatalog(client: PoolClient): Promise<void> {
+  await client.query("DELETE FROM demo_event_catalog WHERE lineup_status = 'active'");
+  await client.query(
+    `
+      UPDATE demo_event_catalog
+      SET lineup_status = 'active',
+          updated_at = NOW()
+      WHERE lineup_status = 'staged'
+    `,
+  );
 }

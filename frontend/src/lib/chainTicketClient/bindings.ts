@@ -237,6 +237,17 @@ export function createEthersBindings(
       maxPerWallet: async () => toBigInt(await ticketRead.maxPerWallet()),
       paused: async () => Boolean(await ticketRead.paused()),
       collectibleMode: async () => Boolean(await ticketRead.collectibleMode()),
+      baseUris: async () => {
+        const [baseTokenURI, collectibleBaseURI] = (await ticketRead.baseUris()) as [
+          string,
+          string,
+        ];
+
+        return {
+          baseTokenURI: String(baseTokenURI),
+          collectibleBaseURI: String(collectibleBaseURI),
+        };
+      },
       isUsed: async (tokenId: bigint) => Boolean(await ticketRead.isUsed(tokenId)),
       tokenURI: async (tokenId: bigint) => String(await ticketRead.tokenURI(tokenId)),
       ownerOf: async (tokenId: bigint) => String(await ticketRead.ownerOf(tokenId)),

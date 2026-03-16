@@ -12,6 +12,12 @@
     grid-column: span 2;
   }
 
+  .experience-banner,
+  .ticket-portfolio-shell,
+  .ticket-detail-pass-grid {
+    grid-template-columns: 1fr;
+  }
+
 }
 
 @media (max-width: 940px) {
@@ -33,6 +39,10 @@
     align-items: flex-start;
   }
 
+  .event-demo-notice {
+    display: grid;
+  }
+
   .ui-button-group.compact {
     width: 100%;
   }
@@ -49,13 +59,16 @@
   .settings-grid,
   .market-form,
   .advanced-grid,
-  .market-toolbar-grid {
+  .market-toolbar-grid,
+  .ticket-portfolio-stats {
     grid-template-columns: 1fr;
   }
 
   .safety-grid,
   .ticket-grid,
-  .listing-grid {
+  .listing-grid,
+  .ticket-pass-grid,
+  .event-switcher {
     grid-template-columns: 1fr;
   }
 
@@ -86,6 +99,11 @@
     display: grid;
   }
 
+  .ticket-pass-heading,
+  .ticket-detail-pass-top {
+    display: grid;
+  }
+
   .ui-info-row {
     grid-template-columns: 1fr;
   }
@@ -105,6 +123,16 @@
   .history-list li {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .ticket-detail-media .ticket-media-asset,
+  .ticket-detail-media .ticket-media-fallback {
+    min-height: 260px;
+  }
+
+  .event-switch-poster,
+  .experience-poster {
+    min-height: 200px;
   }
 
   .ui-progress-stepper {

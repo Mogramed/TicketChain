@@ -52,6 +52,7 @@ export interface TicketBindings {
   maxPerWallet: () => Promise<bigint>;
   paused: () => Promise<boolean>;
   collectibleMode: () => Promise<boolean>;
+  baseUris?: () => Promise<{ baseTokenURI: string; collectibleBaseURI: string }>;
   isUsed: (tokenId: bigint) => Promise<boolean>;
   tokenURI: (tokenId: bigint) => Promise<string>;
   ownerOf: (tokenId: bigint) => Promise<string>;

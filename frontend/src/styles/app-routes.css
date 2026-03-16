@@ -174,6 +174,12 @@
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+.ticket-pass-grid {
+  display: grid;
+  gap: var(--arena-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
 .listing-card,
 .ticket-card {
   gap: var(--arena-space-3);
@@ -247,6 +253,264 @@
   background:
     radial-gradient(120% 100% at 100% 0%, rgba(39, 216, 178, 0.12), transparent 78%),
     var(--arena-surface-muted);
+}
+
+.ticket-portfolio-shell {
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  align-items: center;
+  background:
+    radial-gradient(100% 120% at 100% 0%, rgba(126, 189, 255, 0.16), transparent 62%),
+    linear-gradient(145deg, rgba(11, 29, 50, 0.92), rgba(7, 18, 33, 0.88));
+}
+
+.ticket-portfolio-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.ticket-portfolio-copy h2 {
+  font-size: clamp(1.2rem, 1.8vw, 1.8rem);
+}
+
+.ticket-portfolio-copy p:last-child {
+  color: var(--arena-text-muted);
+  max-width: 56ch;
+}
+
+.ticket-portfolio-stats {
+  display: grid;
+  gap: var(--arena-space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ticket-portfolio-stat {
+  min-height: 120px;
+  align-content: end;
+  background:
+    radial-gradient(120% 100% at 100% 0%, rgba(39, 216, 178, 0.1), transparent 72%),
+    rgba(255, 255, 255, 0.03);
+}
+
+.ticket-portfolio-stat span {
+  color: var(--arena-text-muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.ticket-portfolio-stat strong {
+  font-size: 1.4rem;
+}
+
+.ticket-pass-card {
+  overflow: hidden;
+  padding: 0;
+  background:
+    linear-gradient(160deg, rgba(11, 27, 44, 0.96), rgba(8, 18, 33, 0.92));
+}
+
+.ticket-pass-visual {
+  position: relative;
+  min-height: 240px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ticket-media {
+  min-height: 100%;
+  height: 100%;
+}
+
+.ticket-media-asset {
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  object-fit: cover;
+  display: block;
+}
+
+.ticket-media-fallback {
+  min-height: 240px;
+  padding: var(--arena-space-5);
+  display: grid;
+  align-content: end;
+  gap: 6px;
+  background:
+    radial-gradient(120% 100% at 100% 0%, rgba(126, 189, 255, 0.26), transparent 68%),
+    radial-gradient(90% 80% at 0% 0%, rgba(39, 216, 178, 0.22), transparent 62%),
+    linear-gradient(150deg, rgba(14, 37, 61, 0.9), rgba(7, 18, 33, 0.92));
+}
+
+.ticket-media-fallback p {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  color: #bfe6ff;
+}
+
+.ticket-media-fallback strong {
+  font-size: clamp(1.1rem, 1.6vw, 1.6rem);
+}
+
+.ticket-media-fallback span {
+  color: var(--arena-text-muted);
+}
+
+.ticket-pass-overlay {
+  position: absolute;
+  inset: auto 14px 14px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--arena-space-2);
+}
+
+.ticket-pass-copy {
+  display: grid;
+  gap: var(--arena-space-3);
+  padding: var(--arena-space-5);
+}
+
+.ticket-pass-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--arena-space-3);
+}
+
+.ticket-pass-kicker {
+  color: var(--arena-text-subtle);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+}
+
+.ticket-pass-description {
+  color: var(--arena-text-muted);
+}
+
+.ticket-pass-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  color: var(--arena-text-muted);
+  font-size: 0.88rem;
+}
+
+.ticket-pass-attribute-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--arena-space-2);
+}
+
+.ticket-pass-attribute-grid,
+.ticket-detail-attribute-grid {
+  display: grid;
+  gap: var(--arena-space-2);
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.ticket-attribute-chip {
+  border-radius: var(--arena-radius-xs);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.ticket-attribute-chip span {
+  color: var(--arena-text-subtle);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.ticket-attribute-chip strong {
+  font-size: 0.92rem;
+}
+
+.ticket-detail-hero {
+  background:
+    radial-gradient(110% 110% at 100% 0%, rgba(126, 189, 255, 0.16), transparent 62%),
+    radial-gradient(80% 90% at 0% 0%, rgba(39, 216, 178, 0.12), transparent 64%),
+    linear-gradient(150deg, rgba(10, 25, 43, 0.96), rgba(8, 18, 33, 0.94));
+}
+
+.ticket-detail-pass {
+  display: grid;
+  gap: var(--arena-space-4);
+}
+
+.ticket-detail-pass-top {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--arena-space-3);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.ticket-detail-pass-top p:last-child {
+  color: var(--arena-text-muted);
+  max-width: 58ch;
+  margin-top: 10px;
+}
+
+.ticket-detail-pass-grid {
+  display: grid;
+  gap: var(--arena-space-4);
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+  align-items: start;
+}
+
+.ticket-detail-artwork-card {
+  gap: var(--arena-space-3);
+}
+
+.ticket-detail-media .ticket-media-asset,
+.ticket-detail-media .ticket-media-fallback {
+  min-height: 360px;
+}
+
+.ticket-detail-media-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--arena-space-2);
+}
+
+.ticket-detail-side {
+  display: grid;
+  gap: var(--arena-space-3);
+}
+
+.ticket-detail-facts {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ticket-qr-panel {
+  border-radius: var(--arena-radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  padding: var(--arena-space-4);
+  display: grid;
+  gap: var(--arena-space-3);
+}
+
+.ticket-qr-shell {
+  display: grid;
+  place-items: center;
+  border-radius: var(--arena-radius-sm);
+  background: #ffffff;
+  padding: 14px;
+}
+
+.ticket-qr-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.ticket-qr-copy span {
+  color: var(--arena-text-muted);
+  font-size: 0.88rem;
 }
 
 .mono {

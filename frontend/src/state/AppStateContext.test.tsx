@@ -110,6 +110,7 @@ function Probe() {
       <div data-testid="bff-mode">{state.bffMode}</div>
       <div data-testid="tx-status">{state.txState.status}</div>
       <div data-testid="activity-count">{state.activity.length}</div>
+      <div data-testid="ticket-count">{state.tickets.length}</div>
 
       <button type="button" onClick={() => void state.connectWallet()}>
         connect
@@ -267,7 +268,7 @@ describe("AppStateProvider", () => {
     expect(screen.getByTestId("status-message")).toHaveTextContent("Wallet disconnected.");
   });
 
-  it("uses BFF health to stay degraded until indexed reads are ready without falling back to RPC", async () => {
+  it("uses direct chain reads while the BFF stays degraded, then switches back once indexed reads recover", async () => {
     const eventSourceUrls: string[] = [];
 
     class FakeEventSource {
@@ -291,12 +292,30 @@ describe("AppStateProvider", () => {
       collectibleMode: false,
     });
     const getListingsMock = vi.fn().mockResolvedValue([]);
+    const getMyTicketsMock = vi.fn().mockResolvedValue([
+      {
+        tokenId: 7n,
+        owner: "0x00000000000000000000000000000000000000AA",
+        used: false,
+        tokenURI: "ipfs://ticket/base/7.json",
+        listed: false,
+        listingPrice: null,
+      },
+    ]);
     const readClient = makeClient({
       getSystemState: getSystemStateMock,
       getListings: getListingsMock,
+      getMyTickets: getMyTicketsMock,
     });
 
     const createClient = vi.fn(() => readClient);
+    const walletConnector = vi.fn().mockResolvedValue({
+      signer: {} as Signer,
+      provider: {} as BrowserProvider,
+      address: "0x00000000000000000000000000000000000000AA",
+      chainId: 80002,
+      providerInfo,
+    });
 
     let readModelReady = false;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -368,6 +387,24 @@ describe("AppStateProvider", () => {
         );
       }
 
+      if (url.includes("/v1/users/")) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                tokenId: "7",
+                owner: "0x00000000000000000000000000000000000000AA",
+                used: false,
+                tokenURI: "ipfs://ticket/base/7.json",
+                listed: false,
+                listingPriceWei: null,
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+
       if (url.includes("/v1/listings")) {
         return new Response(
           JSON.stringify({
@@ -415,13 +452,24 @@ describe("AppStateProvider", () => {
         governancePortalUrl: null,
       },
       createClient,
+      walletConnector,
     });
 
     await waitFor(() => {
       expect(screen.getByTestId("bff-mode")).toHaveTextContent("degraded");
     });
-    expect(getSystemStateMock).not.toHaveBeenCalled();
-    expect(getListingsMock).not.toHaveBeenCalled();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "connect" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("wallet-address")).toHaveTextContent("0x00000000000000000000000000000000000000AA");
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("ticket-count")).toHaveTextContent("1");
+    });
+    expect(getSystemStateMock).toHaveBeenCalled();
+    expect(getListingsMock).toHaveBeenCalled();
+    expect(getMyTicketsMock).toHaveBeenCalled();
     expect(eventSourceUrls).toHaveLength(0);
     expect(fetchMock).not.toHaveBeenCalledWith(
       expect.stringContaining("/v1/system"),
@@ -430,16 +478,12 @@ describe("AppStateProvider", () => {
 
     readModelReady = true;
 
-    const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "refresh" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("bff-mode")).toHaveTextContent("online");
     });
-    expect(getSystemStateMock).not.toHaveBeenCalled();
-    expect(getListingsMock).not.toHaveBeenCalled();
     expect(eventSourceUrls).toEqual(["http://localhost:8787/v1/events/stream?eventId=main-event"]);
-    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/v1/system"))).toBe(true);
   });
 
   it("handles success and error transaction flows with tx/activity updates", async () => {

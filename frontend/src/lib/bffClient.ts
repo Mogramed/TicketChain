@@ -21,6 +21,8 @@ interface BffSystemPayload {
   maxPerWallet: string;
   paused: boolean;
   collectibleMode: boolean;
+  baseTokenURI?: string;
+  collectibleBaseURI?: string;
 }
 
 interface BffListingPayload {
@@ -78,6 +80,17 @@ interface BffEventDeploymentPayload {
   checkInRegistryAddress: string;
   deploymentBlock: number;
   registeredAt: number;
+  isDemoInspired?: boolean;
+  demoDisclaimer?: string;
+  source?: "ticketmaster";
+  sourceEventId?: string;
+  sourceUrl?: string | null;
+  startsAt?: number | null;
+  venueName?: string | null;
+  city?: string | null;
+  countryCode?: string | null;
+  imageUrl?: string | null;
+  category?: string | null;
 }
 
 interface BffOperationalRolePayload {
@@ -137,6 +150,8 @@ function parseSystem(payload: BffSystemPayload): SystemState {
     maxPerWallet: BigInt(payload.maxPerWallet),
     paused: payload.paused,
     collectibleMode: payload.collectibleMode,
+    baseTokenURI: payload.baseTokenURI ?? "",
+    collectibleBaseURI: payload.collectibleBaseURI ?? "",
   };
 }
 
@@ -204,6 +219,17 @@ function parseEvents(payload: BffEventDeploymentPayload[]): EventDeployment[] {
     checkInRegistryAddress: item.checkInRegistryAddress,
     deploymentBlock: item.deploymentBlock,
     registeredAt: item.registeredAt,
+    isDemoInspired: item.isDemoInspired ?? false,
+    demoDisclaimer: item.demoDisclaimer ?? undefined,
+    source: item.source,
+    sourceEventId: item.sourceEventId,
+    sourceUrl: item.sourceUrl ?? null,
+    startsAt: item.startsAt ?? null,
+    venueName: item.venueName ?? null,
+    city: item.city ?? null,
+    countryCode: item.countryCode ?? null,
+    imageUrl: item.imageUrl ?? null,
+    category: item.category ?? null,
   }));
 }
 
@@ -314,6 +340,7 @@ export class BffClient {
     try {
       const response = await fetch(`${this.baseUrl}${path}`, {
         method: "GET",
+        cache: "no-store",
         headers: {
           Accept: "application/json",
         },

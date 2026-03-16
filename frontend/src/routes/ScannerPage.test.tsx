@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n/I18nContext";
+import { extractTokenId } from "../lib/scannerToken";
 import { ScannerPage } from "./ScannerPage";
 
 const useAppStateMock = vi.fn();
@@ -81,5 +82,10 @@ describe("ScannerPage", () => {
         description: expect.stringMatching(/irreversible/i),
       }),
     );
+  });
+
+  it("extracts token ids from ticket deep links generated for mobile entry", () => {
+    expect(extractTokenId("https://demo.chainticket.app/app/tickets/77?eventId=main-event")).toBe("77");
+    expect(extractTokenId("https://demo.chainticket.app/app/tickets/77?eventId=main-event&view=collectible")).toBe("77");
   });
 });

@@ -9,6 +9,7 @@ export const TICKET_NFT_ABI = [
   "function maxPerWallet() view returns (uint256)",
   "function paused() view returns (bool)",
   "function collectibleMode() view returns (bool)",
+  "function baseUris() view returns (string baseTokenURI, string collectibleBaseURI)",
   "function nonces(uint256 tokenId) view returns (uint256)",
   "function isUsed(uint256 tokenId) view returns (bool)",
   "function tokenURI(uint256 tokenId) view returns (string)",

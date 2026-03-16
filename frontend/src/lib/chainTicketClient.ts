@@ -179,6 +179,7 @@ export function createChainTicketClientFromBindings(
         maxPerWallet,
         paused,
         collectibleMode,
+        baseUris,
       ] = await Promise.all([
         bindings.ticket.primaryPrice(),
         bindings.ticket.maxSupply(),
@@ -186,6 +187,15 @@ export function createChainTicketClientFromBindings(
         bindings.ticket.maxPerWallet(),
         bindings.ticket.paused(),
         bindings.ticket.collectibleMode(),
+        bindings.ticket.baseUris
+          ? bindings.ticket.baseUris().catch(() => ({
+              baseTokenURI: "",
+              collectibleBaseURI: "",
+            }))
+          : Promise.resolve({
+              baseTokenURI: "",
+              collectibleBaseURI: "",
+            }),
       ]);
 
       return {
@@ -195,6 +205,8 @@ export function createChainTicketClientFromBindings(
         maxPerWallet,
         paused,
         collectibleMode,
+        baseTokenURI: baseUris.baseTokenURI,
+        collectibleBaseURI: baseUris.collectibleBaseURI,
       };
     },
 

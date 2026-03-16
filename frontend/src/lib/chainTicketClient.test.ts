@@ -36,6 +36,10 @@ function makeBaseBindings() {
       maxPerWallet: vi.fn().mockResolvedValue(2n),
       paused: vi.fn().mockResolvedValue(false),
       collectibleMode: vi.fn().mockResolvedValue(false),
+      baseUris: vi.fn().mockResolvedValue({
+        baseTokenURI: "ipfs://ticket/base/",
+        collectibleBaseURI: "ipfs://ticket/collectible/",
+      }),
       isUsed: vi.fn().mockResolvedValue(false),
       tokenURI: vi.fn().mockImplementation(async (tokenId: bigint) => `ipfs://ticket/${tokenId}.json`),
       ownerOf: vi.fn().mockResolvedValue("0x00000000000000000000000000000000000000BB"),
@@ -228,6 +232,16 @@ describe("chainTicketClient", () => {
     expect(bindings.marketplace.list).toHaveBeenCalledWith(9n, parseEther("0.08"));
     expect(bindings.marketplace.listWithPermit).toHaveBeenCalledWith(10n, parseEther("0.07"));
     expect(bindings.marketplace.buy).toHaveBeenCalledWith(4n, parseEther("0.09"));
+  });
+
+  it("returns preview-ready base uris in system state", async () => {
+    const bindings = makeBaseBindings();
+    const client = createChainTicketClientFromBindings(config, bindings);
+
+    const systemState = await client.getSystemState();
+
+    expect(systemState.baseTokenURI).toBe("ipfs://ticket/base/");
+    expect(systemState.collectibleBaseURI).toBe("ipfs://ticket/collectible/");
   });
 
   it("keeps scanner-admin separate from governance admin in role detection", async () => {

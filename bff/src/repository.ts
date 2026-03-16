@@ -1,5 +1,7 @@
 import { pool } from "./db.js";
 import type {
+  DemoCatalogEntry,
+  DemoLineupStatus,
   OperationalActivity,
   OperationalRoleAssignment,
   TicketEventDeployment,
@@ -67,6 +69,25 @@ interface OpsActivityRow {
   log_index: number;
   tx_hash: string;
   block_timestamp: string | null;
+}
+
+interface DemoCatalogRow {
+  lineup_status: DemoLineupStatus;
+  slot_index: number;
+  ticket_event_id: string;
+  source: "ticketmaster";
+  source_event_id: string;
+  name: string;
+  starts_at: string | null;
+  venue_name: string | null;
+  city: string | null;
+  country_code: string | null;
+  image_url: string | null;
+  category: string | null;
+  source_url: string | null;
+  fetched_at: string;
+  expires_at: string;
+  demo_disclaimer: string;
 }
 
 export async function getIndexedBlock(): Promise<number> {
@@ -367,4 +388,53 @@ export async function getOperationalSummary(ticketEventId: string): Promise<{
       timestamp: row.block_timestamp ? Number(row.block_timestamp) : null,
     })),
   };
+}
+
+export async function getDemoCatalogEntries(
+  lineupStatus: DemoLineupStatus,
+): Promise<DemoCatalogEntry[]> {
+  const result = await pool.query<DemoCatalogRow>(
+    `
+      SELECT
+        lineup_status,
+        slot_index,
+        ticket_event_id,
+        source,
+        source_event_id,
+        name,
+        starts_at,
+        venue_name,
+        city,
+        country_code,
+        image_url,
+        category,
+        source_url,
+        fetched_at,
+        expires_at,
+        demo_disclaimer
+      FROM demo_event_catalog
+      WHERE lineup_status = $1
+      ORDER BY slot_index ASC
+    `,
+    [lineupStatus],
+  );
+
+  return result.rows.map((row) => ({
+    lineupStatus: row.lineup_status,
+    slotIndex: row.slot_index,
+    ticketEventId: row.ticket_event_id,
+    source: row.source,
+    sourceEventId: row.source_event_id,
+    name: row.name,
+    startsAt: row.starts_at === null ? null : Number(row.starts_at),
+    venueName: row.venue_name,
+    city: row.city,
+    countryCode: row.country_code,
+    imageUrl: row.image_url,
+    category: row.category,
+    sourceUrl: row.source_url,
+    fetchedAt: Number(row.fetched_at),
+    expiresAt: Number(row.expires_at),
+    demoDisclaimer: row.demo_disclaimer,
+  }));
 }

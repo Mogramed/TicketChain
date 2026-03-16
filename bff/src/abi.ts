@@ -5,6 +5,8 @@ export const TICKET_NFT_ABI = [
   "function maxPerWallet() view returns (uint256)",
   "function paused() view returns (bool)",
   "function collectibleMode() view returns (bool)",
+  "function baseUris() view returns (string baseTokenURI, string collectibleBaseURI)",
+  "function setBaseUris(string baseTokenURI, string collectibleBaseURI)",
   "function ownerOf(uint256 tokenId) view returns (address)",
   "function tokenURI(uint256 tokenId) view returns (string)",
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
@@ -31,4 +33,5 @@ export const CHECKIN_ABI = [
 export const FACTORY_ABI = [
   "function totalEvents() view returns (uint256)",
   "function getEventAt(uint256 index) view returns ((string eventId,string name,string symbol,uint256 primaryPrice,uint256 maxSupply,address treasury,address admin,address ticketNFT,address marketplace,address checkInRegistry,uint256 deploymentBlock,uint256 registeredAt))",
+  "function getEventById(string eventId) view returns ((string eventId,string name,string symbol,uint256 primaryPrice,uint256 maxSupply,address treasury,address admin,address ticketNFT,address marketplace,address checkInRegistry,uint256 deploymentBlock,uint256 registeredAt))",
 ] as const;

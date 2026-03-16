@@ -22,6 +22,8 @@ services:
       context: ./bff
     container_name: chainticket-bff
     restart: unless-stopped
+    env_file:
+      - ./bff/.env
     depends_on:
       postgres:
         condition: service_healthy
@@ -29,23 +31,7 @@ services:
       PORT: 8787
       NODE_ENV: production
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/chainticket
-      AMOY_RPC_URL: ${AMOY_RPC_URL:-https://rpc-amoy.polygon.technology}
-      CHAIN_ID: 80002
-      DEPLOYMENT_BLOCK: ${DEPLOYMENT_BLOCK:-0}
-      TICKET_NFT_ADDRESS: ${TICKET_NFT_ADDRESS:-0x0000000000000000000000000000000000000000}
-      MARKETPLACE_ADDRESS: ${MARKETPLACE_ADDRESS:-0x0000000000000000000000000000000000000000}
-      CHECKIN_REGISTRY_ADDRESS: ${CHECKIN_REGISTRY_ADDRESS:-0x0000000000000000000000000000000000000000}
-      INDEXER_BATCH_SIZE: ${INDEXER_BATCH_SIZE:-400}
-      INDEXER_MIN_BATCH_SIZE: ${INDEXER_MIN_BATCH_SIZE:-60}
-      INDEXER_POLL_INTERVAL_MS: ${INDEXER_POLL_INTERVAL_MS:-4000}
-      INDEXER_INTER_BATCH_DELAY_MS: ${INDEXER_INTER_BATCH_DELAY_MS:-100}
-      INDEXER_CONFIRMATIONS: 0
-      INDEXER_RATE_LIMIT_COOLDOWN_MS: 8000
-      INDEXER_MAX_BACKOFF_MS: 120000
-      INDEXER_MAX_CONSECUTIVE_RATE_LIMITS: 8
-      INDEXER_STOP_ON_MAX_RATE_LIMIT: true
       CORS_ORIGINS: http://localhost:5173
-      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-160}
     ports:
       - "8787:8787"
 

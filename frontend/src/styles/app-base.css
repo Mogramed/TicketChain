@@ -303,11 +303,9 @@ textarea:focus-visible,
   border-radius: var(--arena-radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.02);
-  padding: 12px 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 46px;
+  padding: 12px 14px;
+  display: grid;
+  min-height: 74px;
   transition: all var(--arena-motion-fast);
 }
 

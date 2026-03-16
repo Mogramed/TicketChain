@@ -27,6 +27,38 @@ export interface TicketEventDeployment {
   checkInRegistryAddress: string;
   deploymentBlock: number;
   registeredAt: number;
+  isDemoInspired?: boolean;
+  demoDisclaimer?: string;
+  source?: "ticketmaster";
+  sourceEventId?: string;
+  sourceUrl?: string | null;
+  startsAt?: number | null;
+  venueName?: string | null;
+  city?: string | null;
+  countryCode?: string | null;
+  imageUrl?: string | null;
+  category?: string | null;
+}
+
+export type DemoLineupStatus = "active" | "staged";
+
+export interface DemoCatalogEntry {
+  lineupStatus: DemoLineupStatus;
+  slotIndex: number;
+  ticketEventId: string;
+  source: "ticketmaster";
+  sourceEventId: string;
+  name: string;
+  startsAt: number | null;
+  venueName: string | null;
+  city: string | null;
+  countryCode: string | null;
+  imageUrl: string | null;
+  category: string | null;
+  sourceUrl: string | null;
+  fetchedAt: number;
+  expiresAt: number;
+  demoDisclaimer: string;
 }
 
 export interface IndexedEventBase {

@@ -12,6 +12,7 @@ import {
   RiskBanner,
   SectionHeader,
 } from "../components/ui/Primitives";
+import { EventDemoNotice } from "../components/events/EventDemoNotice";
 import { useI18n } from "../i18n/I18nContext";
 import { formatAddress, formatTimestamp } from "../lib/format";
 import { useAppState } from "../state/useAppState";
@@ -35,7 +36,11 @@ export function FanPage() {
     walletAddress,
     uiMode,
     connectWallet,
+    availableEvents,
+    selectedEventId,
   } = useAppState();
+  const selectedEvent =
+    availableEvents.find((event) => event.ticketEventId === selectedEventId) ?? null;
 
   const mintPreflight = useMemo(() => {
     if (!pendingPreview || pendingPreview.action?.type !== "mint" || !pendingPreview.preflight) {
@@ -115,6 +120,8 @@ export function FanPage() {
           </button>
         }
       />
+
+      <EventDemoNotice event={selectedEvent} />
 
       <Panel className="primary-panel">
         <SectionHeader

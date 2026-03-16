@@ -41,6 +41,9 @@ Useful scripts:
 - `npm run deploy:amoy`
 - `npm run demo:amoy`
 - `npm run demo:local`
+- `npm run demo:lineup:prepare`
+- `npm run demo:lineup:deploy`
+- `npm run demo:assets:sync`
 
 Deployment supports an optional governance handoff to a multisig or timelock via the variables in `.env.example`.
 The deploy script can also publish the deployed event into `ChainTicketFactory` using `EVENT_ID`, `DEPLOY_CHAIN_TICKET_FACTORY`, and/or `CHAIN_TICKET_FACTORY_ADDRESS`.
@@ -89,6 +92,8 @@ npm run dev
 
 The BFF indexes every event deployment registered in the current catalog block-by-block and serves versioned read APIs:
 
+- `GET /demo-assets/:ticketEventId/:variant/:tokenId.json`
+- `GET /demo-assets/:ticketEventId/:variant/:tokenId.svg`
 - `GET /v1/health`
 - `GET /v1/metrics`
 - `GET /v1/events`
@@ -99,6 +104,15 @@ The BFF indexes every event deployment registered in the current catalog block-b
 - `GET /v1/users/:address/tickets`
 - `GET /v1/tickets/:tokenId/timeline`
 - `GET /v1/events/stream` (SSE)
+
+For the investor demo lineup:
+
+- `npm run demo:lineup:prepare` fetches a staged 5-event Ticketmaster-inspired lineup and stores it in Postgres
+- `npm run demo:lineup:deploy` deploys the staged lineup through the existing `deploy:amoy` flow, then promotes it as the active catalog
+- `npm run demo:assets:sync` updates the already-deployed demo events so their on-chain `tokenURI` bases point at the local BFF-hosted metadata and SVG artwork
+- `GET /v1/events` now merges the active on-chain deployments with the stored editorial metadata: date, venue, city, country, image, category, and demo disclaimer
+
+For local demo visuals, set the demo deployment roots in `.env` to `http://localhost:8787/demo-assets/`. Existing deployed demo events can be migrated to these live metadata routes with `npm run demo:assets:sync`.
 
 Single-event mode now requires a real positive `DEPLOYMENT_BLOCK` whenever `TICKET_NFT_ADDRESS`, `MARKETPLACE_ADDRESS`, and `CHECKIN_REGISTRY_ADDRESS` are configured. The BFF will fail fast at startup if that boundary is missing.
 
@@ -134,6 +148,13 @@ This starts:
 
 - `postgres` on `localhost:5432`
 - `bff` on `localhost:8787`
+
+The `bff` container reads its application settings from `bff/.env`. Docker Compose overrides only the database host so the container can reach Postgres on the internal `postgres` service instead of `localhost`.
+
+Important for the demo lineup:
+
+- keep `FACTORY_ADDRESS` and `DEFAULT_EVENT_ID` set in `bff/.env`
+- do not run `npm run bff:dev` at the same time as `docker compose up --build`, because both bind port `8787`
 
 Frontend can consume the BFF with:
 

@@ -6,9 +6,16 @@ import helmet from "helmet";
 
 import { FACTORY_ABI } from "./abi.js";
 import { config } from "./config.js";
+import { mergeDemoCatalogEntries } from "./demoCatalog.js";
+import {
+  buildDemoTicketMetadata,
+  buildDemoTicketSvg,
+  isDemoAssetVariant,
+} from "./demoAssets.js";
 import { logger, requestLogger } from "./logger.js";
 import {
   getActiveListings,
+  getDemoCatalogEntries,
   getEventDeployments as getStoredEventDeployments,
   getIndexedBlock,
   getMarketStats,
@@ -248,27 +255,66 @@ export function createApp(indexer: ChainIndexer) {
   };
   const systemStateCache = new Map<string, { value: SystemStatePayload; cachedAt: number }>();
 
+  const getFactoryCatalog = async (): Promise<TicketEventDeployment[]> => {
+    if (!factoryContract) {
+      return [];
+    }
+
+    const totalEvents = Number(await factoryContract.totalEvents());
+    const rawDeployments = await Promise.all(
+      Array.from({ length: totalEvents }, async (_value, index) =>
+        factoryContract.getEventAt(index),
+      ),
+    );
+    return rawDeployments.map((raw) => parseFactoryDeployment(raw));
+  };
+
   const getEventCatalog = async (): Promise<TicketEventDeployment[]> => {
     if (catalogCache && Date.now() - catalogCache.cachedAt < 30_000) {
       return catalogCache.items;
     }
 
-    let items: TicketEventDeployment[];
-
-    items = await getStoredEventDeployments();
-
-    if (items.length > 0) {
-      // Use the indexed catalog when available so the frontend only sees events
-      // that the BFF can actively serve.
-    } else if (factoryContract) {
-      const totalEvents = Number(await factoryContract.totalEvents());
-      const rawDeployments = await Promise.all(
-        Array.from({ length: totalEvents }, async (_value, index) =>
-          factoryContract.getEventAt(index),
-        ),
+    let items = await getStoredEventDeployments();
+    const activeDemoEntries = await getDemoCatalogEntries("active");
+    const missingActiveDeployments =
+      activeDemoEntries.length > 0 &&
+      activeDemoEntries.some(
+        (entry) => !items.some((item) => item.ticketEventId === entry.ticketEventId),
       );
-      items = rawDeployments.map((raw) => parseFactoryDeployment(raw));
-    } else {
+
+    if (factoryContract && (items.length === 0 || missingActiveDeployments)) {
+      try {
+        const factoryItems = await getFactoryCatalog();
+
+        if (items.length === 0) {
+          items = factoryItems;
+        } else {
+          const byId = new Map(items.map((item) => [item.ticketEventId, item] as const));
+          for (const deployment of factoryItems) {
+            if (!byId.has(deployment.ticketEventId)) {
+              byId.set(deployment.ticketEventId, deployment);
+            }
+          }
+          items = [...byId.values()];
+        }
+      } catch (error) {
+        logger.warn(
+          {
+            error: normalizeError(error),
+            storedCount: items.length,
+            activeDemoCount: activeDemoEntries.length,
+            usedCatalogCacheFallback: Boolean(catalogCache),
+          },
+          "Falling back to stored event catalog after factory lookup failed.",
+        );
+
+        if (items.length === 0 && catalogCache) {
+          return catalogCache.items;
+        }
+      }
+    }
+
+    if (items.length === 0) {
       items = [
         {
           ticketEventId: config.defaultEventId,
@@ -286,6 +332,7 @@ export function createApp(indexer: ChainIndexer) {
         },
       ];
     }
+    items = mergeDemoCatalogEntries(items, activeDemoEntries);
 
     catalogCache = {
       items,
@@ -366,6 +413,50 @@ export function createApp(indexer: ChainIndexer) {
     );
   };
 
+  const resolveDemoAssetRequest = async (params: {
+    ticketEventId: string;
+    tokenId: string;
+    variant: string;
+  }): Promise<{
+    event: TicketEventDeployment;
+    tokenId: bigint;
+    variant: "live" | "collectible";
+  }> => {
+    if (!isDemoAssetVariant(params.variant)) {
+      throw new Error(`Unsupported demo asset variant: ${params.variant}`);
+    }
+
+    if (!/^\d+$/.test(params.tokenId)) {
+      throw new Error(`Invalid tokenId: ${params.tokenId}`);
+    }
+
+    const catalog = await getEventCatalog();
+    const event = catalog.find((item) => item.ticketEventId === params.ticketEventId);
+    if (!event) {
+      throw new Error(`Unknown ticket event id: ${params.ticketEventId}`);
+    }
+    if (!event.isDemoInspired) {
+      throw new Error(`Demo assets are only available for demo-inspired events: ${params.ticketEventId}`);
+    }
+
+    const tokenId = BigInt(params.tokenId);
+    const maxSupply = BigInt(event.maxSupply || "0");
+    if (tokenId < 0n) {
+      throw new Error(`tokenId must be greater than or equal to 0 for ${params.ticketEventId}`);
+    }
+    if (maxSupply > 0n && tokenId > maxSupply) {
+      throw new Error(
+        `tokenId ${params.tokenId} is outside the max supply for ${params.ticketEventId}`,
+      );
+    }
+
+    return {
+      event,
+      tokenId,
+      variant: params.variant,
+    };
+  };
+
   app.set("trust proxy", 1);
   app.use(requestLogger);
   app.use(
@@ -405,6 +496,52 @@ export function createApp(indexer: ChainIndexer) {
     }),
   );
   app.use(express.json({ limit: "64kb" }));
+
+  app.get("/demo-assets/:ticketEventId/:variant/:tokenId.json", async (request, response, next) => {
+    try {
+      const asset = await resolveDemoAssetRequest({
+        ticketEventId: request.params.ticketEventId ?? "",
+        tokenId: request.params.tokenId ?? "",
+        variant: request.params.variant ?? "",
+      });
+      const origin = `${request.protocol}://${request.get("host") ?? `localhost:${config.port}`}`;
+
+      response.setHeader("Content-Type", "application/json; charset=utf-8");
+      response.setHeader("Cache-Control", "public, max-age=60");
+      response.json(
+        buildDemoTicketMetadata({
+          event: asset.event,
+          tokenId: asset.tokenId,
+          variant: asset.variant,
+          origin,
+        }),
+      );
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/demo-assets/:ticketEventId/:variant/:tokenId.svg", async (request, response, next) => {
+    try {
+      const asset = await resolveDemoAssetRequest({
+        ticketEventId: request.params.ticketEventId ?? "",
+        tokenId: request.params.tokenId ?? "",
+        variant: request.params.variant ?? "",
+      });
+
+      response.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+      response.setHeader("Cache-Control", "public, max-age=60");
+      response.send(
+        buildDemoTicketSvg({
+          event: asset.event,
+          tokenId: asset.tokenId,
+          variant: asset.variant,
+        }),
+      );
+    } catch (error) {
+      next(error);
+    }
+  });
 
   app.get("/v1/health", async (_request, response, next) => {
     try {
@@ -496,9 +633,13 @@ export function createApp(indexer: ChainIndexer) {
   app.get("/v1/events", async (_request, response, next) => {
     try {
       const items = await getEventCatalog();
+      const defaultEventId =
+        items.find((item) => item.ticketEventId === config.defaultEventId)?.ticketEventId ??
+        items[0]?.ticketEventId ??
+        config.defaultEventId;
       response.json({
         items,
-        defaultEventId: config.defaultEventId,
+        defaultEventId,
       });
     } catch (error) {
       next(error);

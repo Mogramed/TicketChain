@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const repositoryMocks = vi.hoisted(() => ({
   getActiveListings: vi.fn(),
+  getDemoCatalogEntries: vi.fn(),
   getEventDeployments: vi.fn(),
   getIndexedBlock: vi.fn(),
   getMarketStats: vi.fn(),
@@ -17,11 +18,14 @@ vi.mock("./repository.js", () => repositoryMocks);
 
 function applyBffEnv(): void {
   process.env.NODE_ENV = "test";
+  delete process.env.BFF_RUNTIME_MODE;
   process.env.PORT = "8787";
   process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/chainticket_test";
   process.env.AMOY_RPC_URL = "https://rpc-amoy.polygon.technology";
   process.env.CHAIN_ID = "80002";
   process.env.DEPLOYMENT_BLOCK = "100";
+  process.env.DEFAULT_EVENT_ID = "main-event";
+  process.env.FACTORY_ADDRESS = "";
   process.env.TICKET_NFT_ADDRESS = "0x0000000000000000000000000000000000000011";
   process.env.MARKETPLACE_ADDRESS = "0x0000000000000000000000000000000000000022";
   process.env.CHECKIN_REGISTRY_ADDRESS = "0x0000000000000000000000000000000000000033";
@@ -72,6 +76,8 @@ class FakeIndexer extends EventEmitter {
       maxPerWallet: "2",
       paused: false,
       collectibleMode: false,
+      baseTokenURI: "ipfs://ticket/base/",
+      collectibleBaseURI: "ipfs://ticket/collectible/",
     };
   }
 }
@@ -83,6 +89,7 @@ describe("createApp", () => {
     applyBffEnv();
     repositoryMocks.getIndexedBlock.mockResolvedValue(120);
     repositoryMocks.getEventDeployments.mockResolvedValue([]);
+    repositoryMocks.getDemoCatalogEntries.mockResolvedValue([]);
     repositoryMocks.getOperationalSummary.mockResolvedValue({
       roles: [],
       recentActivity: [],
@@ -201,6 +208,8 @@ describe("createApp", () => {
         maxPerWallet: "2",
         paused: false,
         collectibleMode: false,
+        baseTokenURI: "ipfs://ticket/base/",
+        collectibleBaseURI: "ipfs://ticket/collectible/",
       }));
 
       override async getCurrentSystemState(ticketEventId?: string) {
@@ -223,6 +232,10 @@ describe("createApp", () => {
 
     expect(firstSystem.status).toBe(200);
     expect(secondSystem.status).toBe(200);
+    expect(firstSystem.body).toMatchObject({
+      baseTokenURI: "ipfs://ticket/base/",
+      collectibleBaseURI: "ipfs://ticket/collectible/",
+    });
     expect(firstHealth.status).toBe(200);
     expect(secondHealth.status).toBe(200);
     expect(firstEvents.status).toBe(200);
@@ -230,5 +243,185 @@ describe("createApp", () => {
     expect(firstOps.status).toBe(200);
     expect(secondOps.status).toBe(429);
     expect(indexer.getCurrentSystemStateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("merges the active demo lineup metadata into the event catalog and keeps the active order", async () => {
+    repositoryMocks.getEventDeployments.mockResolvedValue([
+      {
+        ticketEventId: "demo-fr-showcase-20260714-abcd12",
+        name: "Original Event Name",
+        symbol: "CTK1",
+        primaryPriceWei: "100000000000000000",
+        maxSupply: "150",
+        treasury: "0x0000000000000000000000000000000000000101",
+        admin: "0x0000000000000000000000000000000000000102",
+        ticketNftAddress: "0x0000000000000000000000000000000000000103",
+        marketplaceAddress: "0x0000000000000000000000000000000000000104",
+        checkInRegistryAddress: "0x0000000000000000000000000000000000000105",
+        deploymentBlock: 222,
+        registeredAt: 333,
+      },
+      {
+        ticketEventId: "demo-gb-showcase-20260801-ef9012",
+        name: "Second Event Name",
+        symbol: "CTK2",
+        primaryPriceWei: "100000000000000000",
+        maxSupply: "150",
+        treasury: "0x0000000000000000000000000000000000000201",
+        admin: "0x0000000000000000000000000000000000000202",
+        ticketNftAddress: "0x0000000000000000000000000000000000000203",
+        marketplaceAddress: "0x0000000000000000000000000000000000000204",
+        checkInRegistryAddress: "0x0000000000000000000000000000000000000205",
+        deploymentBlock: 444,
+        registeredAt: 555,
+      },
+    ]);
+    repositoryMocks.getDemoCatalogEntries.mockResolvedValue([
+      {
+        lineupStatus: "active",
+        slotIndex: 0,
+        ticketEventId: "demo-gb-showcase-20260801-ef9012",
+        source: "ticketmaster",
+        sourceEventId: "tm-200",
+        name: "Headliner Comedy Night",
+        startsAt: 1785542400000,
+        venueName: "Royal Hall",
+        city: "London",
+        countryCode: "GB",
+        imageUrl: "https://images.example/gb-event.jpg",
+        category: "Comedy",
+        sourceUrl: "https://ticketmaster.example/gb-event",
+        fetchedAt: 1780000000000,
+        expiresAt: 1780086400000,
+        demoDisclaimer: "Demo pass only - not official venue admission",
+      },
+      {
+        lineupStatus: "active",
+        slotIndex: 1,
+        ticketEventId: "demo-fr-showcase-20260714-abcd12",
+        source: "ticketmaster",
+        sourceEventId: "tm-100",
+        name: "Mega Stadium Tour",
+        startsAt: 1783036800000,
+        venueName: "Accor Arena",
+        city: "Paris",
+        countryCode: "FR",
+        imageUrl: "https://images.example/fr-event.jpg",
+        category: "Music",
+        sourceUrl: "https://ticketmaster.example/fr-event",
+        fetchedAt: 1780000000000,
+        expiresAt: 1780086400000,
+        demoDisclaimer: "Demo pass only - not official venue admission",
+      },
+    ]);
+
+    const { createApp } = await import("./app.js");
+    const app = createApp(new FakeIndexer() as never);
+
+    const eventsResponse = await request(app).get("/v1/events");
+
+    expect(eventsResponse.status).toBe(200);
+    expect(eventsResponse.body.defaultEventId).toBe("demo-gb-showcase-20260801-ef9012");
+    expect(eventsResponse.body.items).toEqual([
+      expect.objectContaining({
+        ticketEventId: "demo-gb-showcase-20260801-ef9012",
+        name: "Second Event Name",
+        isDemoInspired: true,
+        source: "ticketmaster",
+        sourceEventId: "tm-200",
+        venueName: "Royal Hall",
+        city: "London",
+        countryCode: "GB",
+        category: "Comedy",
+      }),
+      expect.objectContaining({
+        ticketEventId: "demo-fr-showcase-20260714-abcd12",
+        name: "Original Event Name",
+        isDemoInspired: true,
+        source: "ticketmaster",
+        sourceEventId: "tm-100",
+        venueName: "Accor Arena",
+        city: "Paris",
+        countryCode: "FR",
+        category: "Music",
+      }),
+    ]);
+  });
+
+  it("serves generated demo ticket metadata and svg artwork for active demo events", async () => {
+    repositoryMocks.getEventDeployments.mockResolvedValue([
+      {
+        ticketEventId: "demo-fr-showcase-20260714-abcd12",
+        name: "Mega Stadium Tour",
+        symbol: "CTK1",
+        primaryPriceWei: "100000000000000000",
+        maxSupply: "150",
+        treasury: "0x0000000000000000000000000000000000000101",
+        admin: "0x0000000000000000000000000000000000000102",
+        ticketNftAddress: "0x0000000000000000000000000000000000000103",
+        marketplaceAddress: "0x0000000000000000000000000000000000000104",
+        checkInRegistryAddress: "0x0000000000000000000000000000000000000105",
+        deploymentBlock: 222,
+        registeredAt: 333,
+      },
+    ]);
+    repositoryMocks.getDemoCatalogEntries.mockResolvedValue([
+      {
+        lineupStatus: "active",
+        slotIndex: 0,
+        ticketEventId: "demo-fr-showcase-20260714-abcd12",
+        source: "ticketmaster",
+        sourceEventId: "tm-100",
+        name: "Mega Stadium Tour",
+        startsAt: 1783036800000,
+        venueName: "Accor Arena",
+        city: "Paris",
+        countryCode: "FR",
+        imageUrl: "https://images.example/fr-event.jpg",
+        category: "Music",
+        sourceUrl: "https://ticketmaster.example/fr-event",
+        fetchedAt: 1780000000000,
+        expiresAt: 1780086400000,
+        demoDisclaimer: "Demo pass only - not official venue admission",
+      },
+    ]);
+
+    const { createApp } = await import("./app.js");
+    const app = createApp(new FakeIndexer() as never);
+
+    const metadataResponse = await request(app).get(
+      "/demo-assets/demo-fr-showcase-20260714-abcd12/live/0.json",
+    );
+    const svgResponse = await request(app).get(
+      "/demo-assets/demo-fr-showcase-20260714-abcd12/collectible/1.svg",
+    );
+    const svgMarkup =
+      typeof svgResponse.text === "string" && svgResponse.text.length > 0
+        ? svgResponse.text
+        : Buffer.from(svgResponse.body).toString("utf8");
+
+    expect(metadataResponse.status).toBe(200);
+    expect(metadataResponse.headers["content-type"]).toContain("application/json");
+    expect(metadataResponse.body).toMatchObject({
+      name: "Mega Stadium Tour Mobile Entry Pass #0",
+      image: expect.stringContaining(
+        "/demo-assets/demo-fr-showcase-20260714-abcd12/live/0.svg",
+      ),
+      external_url: "https://ticketmaster.example/fr-event",
+    });
+    expect(metadataResponse.body.attributes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ trait_type: "Venue", value: "Accor Arena" }),
+        expect.objectContaining({ trait_type: "City", value: "Paris" }),
+        expect.objectContaining({ trait_type: "Section" }),
+        expect.objectContaining({ trait_type: "Seat" }),
+      ]),
+    );
+
+    expect(svgResponse.status).toBe(200);
+    expect(svgResponse.headers["content-type"]).toContain("image/svg+xml");
+    expect(svgMarkup).toContain("Mega Stadium Tour");
+    expect(svgMarkup).toContain("Collectible Edition");
+    expect(svgMarkup).toContain("Demo pass only");
   });
 });

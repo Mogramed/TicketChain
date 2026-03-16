@@ -545,6 +545,10 @@ describe("ChainTicket V1", function () {
 
       await (await ticket.connect(seller).mintPrimary({ value: primaryPrice })).wait();
 
+      expect(await ticket.baseUris()).to.deep.equal([
+        "ipfs://ticket/base/",
+        "ipfs://ticket/collectible/",
+      ]);
       expect(await ticket.tokenURI(0n)).to.equal("ipfs://ticket/base/0.json");
 
       await expect(ticket.setCollectibleMode(true))
@@ -570,6 +574,10 @@ describe("ChainTicket V1", function () {
         .and.to.emit(ticket, "BatchMetadataUpdate")
         .withArgs(0n, 0n);
 
+      expect(await ticket.baseUris()).to.deep.equal([
+        "ipfs://ticket/new-base/",
+        "ipfs://ticket/new-collectible/",
+      ]);
       expect(await ticket.tokenURI(0n)).to.equal("ipfs://ticket/new-base/0.json");
     });
   });

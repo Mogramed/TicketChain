@@ -74,6 +74,8 @@ interface CachedSystemState {
   maxPerWallet: string;
   paused: boolean;
   collectibleMode: boolean;
+  baseTokenURI: string;
+  collectibleBaseURI: string;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -323,7 +325,15 @@ export class ChainIndexer extends EventEmitter {
     const contractSet = await this.getContractSet(ticketEventId);
 
     try {
-      const [primaryPrice, maxSupply, totalMinted, maxPerWallet, paused, collectibleMode] =
+      const [
+        primaryPrice,
+        maxSupply,
+        totalMinted,
+        maxPerWallet,
+        paused,
+        collectibleMode,
+        baseUris,
+      ] =
         await Promise.all([
           contractSet.ticketContract.primaryPrice(),
           contractSet.ticketContract.maxSupply(),
@@ -331,6 +341,7 @@ export class ChainIndexer extends EventEmitter {
           contractSet.ticketContract.maxPerWallet(),
           contractSet.ticketContract.paused(),
           contractSet.ticketContract.collectibleMode(),
+          contractSet.ticketContract.baseUris().catch(() => ["", ""]),
         ]);
 
       const fresh: CachedSystemState = {
@@ -340,6 +351,8 @@ export class ChainIndexer extends EventEmitter {
         maxPerWallet: String(maxPerWallet),
         paused: Boolean(paused),
         collectibleMode: Boolean(collectibleMode),
+        baseTokenURI: String(baseUris[0] ?? ""),
+        collectibleBaseURI: String(baseUris[1] ?? ""),
       };
 
       this.cachedSystemStates.set(ticketEventId, {

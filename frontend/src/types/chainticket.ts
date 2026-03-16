@@ -24,6 +24,17 @@ export interface EventDeployment {
   checkInRegistryAddress: string;
   deploymentBlock: number;
   registeredAt: number;
+  isDemoInspired?: boolean;
+  demoDisclaimer?: string;
+  source?: "ticketmaster";
+  sourceEventId?: string;
+  sourceUrl?: string | null;
+  startsAt?: number | null;
+  venueName?: string | null;
+  city?: string | null;
+  countryCode?: string | null;
+  imageUrl?: string | null;
+  category?: string | null;
 }
 
 export type ContractScope = "ticket" | "checkin_registry";
@@ -126,6 +137,47 @@ export interface TicketView {
   tokenURI: string;
   listed: boolean;
   listingPrice: bigint | null;
+}
+
+export interface TicketAttribute {
+  traitType: string;
+  value: string;
+  displayType?: string;
+}
+
+export interface TicketMetadata {
+  tokenUri: string;
+  name: string | null;
+  description: string | null;
+  image: string | null;
+  animationUrl: string | null;
+  externalUrl: string | null;
+  backgroundColor: string | null;
+  attributes: TicketAttribute[];
+}
+
+export interface TicketMediaAsset {
+  kind: "image" | "animation" | "fallback";
+  src: string | null;
+  posterSrc: string | null;
+  alt: string;
+}
+
+export interface TicketPreviewState {
+  liveTokenUri: string | null;
+  collectibleTokenUri: string | null;
+  activeTokenUri: string;
+  liveMetadata: TicketMetadata | null;
+  collectibleMetadata: TicketMetadata | null;
+  activeMetadata: TicketMetadata | null;
+  liveMedia: TicketMediaAsset | null;
+  collectibleMedia: TicketMediaAsset | null;
+  activeMedia: TicketMediaAsset;
+  activeView: "live" | "collectible";
+  liveQrValue: string | null;
+  collectibleQrValue: string | null;
+  isLoading: boolean;
+  errorMessage: string | null;
 }
 
 export interface MarketplaceView {
@@ -232,6 +284,8 @@ export interface SystemState {
   maxPerWallet: bigint;
   paused: boolean;
   collectibleMode: boolean;
+  baseTokenURI?: string;
+  collectibleBaseURI?: string;
 }
 
 export interface TxResponseLike {

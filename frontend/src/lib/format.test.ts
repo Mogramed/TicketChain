@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatPol, parsePolInput, remainingSupply } from "./format";
+import { formatEventStart, formatPol, parsePolInput, remainingSupply } from "./format";
 
 describe("format utilities", () => {
   it("formats POL values with trimmed precision", () => {
@@ -19,5 +19,10 @@ describe("format utilities", () => {
   it("computes non-negative remaining supply", () => {
     expect(remainingSupply(100n, 25n)).toBe(75n);
     expect(remainingSupply(10n, 30n)).toBe(0n);
+  });
+
+  it("formats event start timestamps with a readable fallback", () => {
+    expect(formatEventStart(null)).toBe("Date to be announced");
+    expect(formatEventStart(Date.parse("2026-06-01T18:30:00Z"))).toContain("2026");
   });
 });

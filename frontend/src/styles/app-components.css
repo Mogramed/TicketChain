@@ -65,6 +65,8 @@
 }
 
 .ui-page-header-copy {
+  flex: 1 1 420px;
+  min-width: 0;
   max-width: 70ch;
   display: grid;
   gap: 8px;
@@ -87,9 +89,12 @@
 }
 
 .ui-page-header-actions {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--arena-space-2);
-  justify-items: end;
+  justify-content: flex-end;
+  align-items: flex-start;
+  min-width: 0;
 }
 
 .ui-page-header-primary,
@@ -98,6 +103,7 @@
   flex-wrap: wrap;
   gap: var(--arena-space-2);
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .stat-tile {

@@ -170,7 +170,7 @@ describe("App route-based smoke", () => {
     );
 
     const user = userEvent.setup();
-    await screen.findByTestId("fan-page", {}, { timeout: 5_000 });
+    await screen.findByTestId("explore-page", {}, { timeout: 5_000 });
 
     const connectButtons = await screen.findAllByRole("button", {
       name: /Connect Wallet|Connecter le wallet|Connect wallet/i,
@@ -183,7 +183,10 @@ describe("App route-based smoke", () => {
       expect(walletConnector).toHaveBeenCalledTimes(1);
     });
 
-    await user.click(screen.getByRole("link", { name: /Market|Marche|Resale|Revente/i }));
+    const marketLinks = screen.getAllByRole("link", {
+      name: /Marketplace|Marche|Resale|Revente/i,
+    });
+    await user.click(marketLinks[0]!);
     await screen.findByTestId("market-page");
 
     await user.clear(screen.getByLabelText(/Token ID/i));
@@ -198,10 +201,14 @@ describe("App route-based smoke", () => {
       expect(walletClient.listTicketWithPermit).toHaveBeenCalledWith(1n, parseEther("0.05"));
     });
 
-    await user.click(screen.getByRole("link", { name: /Tickets|My Tickets|Mes billets/i }));
+    const ticketLinks = screen.getAllByRole("link", {
+      name: /Tickets|My Tickets|Ticket Vault/i,
+    });
+    await user.click(ticketLinks[0]!);
 
     await waitFor(() => {
-      expect(screen.getByText(/Used|Utilise/i, { selector: "span" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /Ticket Vault/i })).toBeInTheDocument();
+      expect(screen.getAllByText(/^Used$/i, { selector: "span" }).length).toBeGreaterThan(0);
     });
   }, 15_000);
 });

@@ -107,6 +107,6 @@ describe("TicketDetailPage", () => {
       expect(screen.getByRole("tab", { name: "Collectible" })).toHaveAttribute("aria-selected", "true");
     });
 
-    expect(screen.getByText(/Lifecycle proof/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Lifecycle proof/i })).toBeInTheDocument();
   });
 });

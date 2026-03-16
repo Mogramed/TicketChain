@@ -239,11 +239,19 @@
 .event-poster.fallback strong {
   font-size: 1.05rem;
   line-height: 1.25;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .event-poster.fallback span {
   color: var(--arena-text-muted);
   font-size: 0.86rem;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .event-demo-notice {

@@ -3,11 +3,12 @@ import { useAppState } from "../../state/useAppState";
 import { Badge, ButtonGroup, InfoList, Panel, RiskBanner } from "../ui/Primitives";
 
 function preflightSummary(
+  locale: ReturnType<typeof useI18n>["locale"],
   t: ReturnType<typeof useI18n>["t"],
   preflight: { ok: boolean; blockers: string[] } | null,
 ): string {
   if (!preflight) {
-    return "No pre-check for this action.";
+    return locale === "fr" ? "Aucun pre-check pour cette action." : "No pre-check for this action.";
   }
   if (preflight.ok) {
     return t("preflightPassed");
@@ -16,7 +17,7 @@ function preflightSummary(
 }
 
 export function TransactionPreviewDrawer() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const { pendingPreview, setPendingPreview, confirmPendingPreview } = useAppState();
 
   if (!pendingPreview) {
@@ -33,6 +34,7 @@ export function TransactionPreviewDrawer() {
       case "approve":
         return t("previewImpactApprove");
       case "list":
+      case "list_with_permit":
         return t("previewImpactList");
       case "cancel":
         return t("previewImpactCancel");
@@ -66,7 +68,13 @@ export function TransactionPreviewDrawer() {
         <header className="preview-header">
           <h2>{pendingPreview.label}</h2>
           <Badge tone={pendingPreview.preflight?.ok ? "success" : "warning"}>
-            {pendingPreview.preflight?.ok ? "Safe to sign" : "Check required"}
+            {pendingPreview.preflight?.ok
+              ? locale === "fr"
+                ? "Pret a signer"
+                : "Safe to sign"
+              : locale === "fr"
+                ? "Verification requise"
+                : "Check required"}
           </Badge>
         </header>
         <p>{pendingPreview.description}</p>
@@ -74,7 +82,7 @@ export function TransactionPreviewDrawer() {
         <RiskBanner
           tone={precheckTone}
           title={t("previewRiskTitle")}
-          cause={preflightSummary(t, pendingPreview.preflight)}
+          cause={preflightSummary(locale, t, pendingPreview.preflight)}
           impact={impactSummary}
           action={
             blockers.length > 0
@@ -87,7 +95,7 @@ export function TransactionPreviewDrawer() {
           entries={[
             {
               label: t("preflightStatus"),
-              value: preflightSummary(t, pendingPreview.preflight),
+              value: preflightSummary(locale, t, pendingPreview.preflight),
             },
             {
               label: t("estimatedGas"),
@@ -95,7 +103,9 @@ export function TransactionPreviewDrawer() {
                 pendingPreview.preflight?.gasEstimate !== null &&
                 pendingPreview.preflight?.gasEstimate !== undefined
                   ? pendingPreview.preflight.gasEstimate.toString()
-                  : "n/a",
+                  : locale === "fr"
+                    ? "n/d"
+                    : "n/a",
             },
           ]}
         />
@@ -103,7 +113,7 @@ export function TransactionPreviewDrawer() {
         {warnings.length > 0 ? (
           <InfoList
             entries={warnings.map((warning, index) => ({
-              label: `Warning ${index + 1}`,
+              label: locale === "fr" ? `Alerte ${index + 1}` : `Warning ${index + 1}`,
               value: warning,
             }))}
           />
@@ -112,10 +122,22 @@ export function TransactionPreviewDrawer() {
         {needsApprovalGuidance ? (
           <RiskBanner
             tone="warning"
-            title="Approval needed first"
-            cause="This ticket has not been approved for the marketplace yet."
-            impact="Listing cannot be signed until the approval transaction is confirmed."
-            action="Close this drawer, run the approval step, then reopen the listing preview."
+            title={locale === "fr" ? "Approbation requise d'abord" : "Approval needed first"}
+            cause={
+              locale === "fr"
+                ? "Ce billet n'a pas encore ete approuve pour le marketplace."
+                : "This ticket has not been approved for the marketplace yet."
+            }
+            impact={
+              locale === "fr"
+                ? "La mise en vente ne peut pas etre signee tant que l'approbation n'est pas confirmee."
+                : "Listing cannot be signed until the approval transaction is confirmed."
+            }
+            action={
+              locale === "fr"
+                ? "Fermez ce drawer, lancez l'approbation, puis rouvrez l'aperçu de mise en vente."
+                : "Close this drawer, run the approval step, then reopen the listing preview."
+            }
           />
         ) : null}
 
@@ -138,7 +160,11 @@ export function TransactionPreviewDrawer() {
             onClick={() => void confirmPendingPreview()}
             disabled={!canConfirm}
           >
-            {canConfirm ? t("confirmAndSign") : "Resolve blockers first"}
+            {canConfirm
+              ? t("confirmAndSign")
+              : locale === "fr"
+                ? "Resoudre les blocages d'abord"
+                : "Resolve blockers first"}
           </button>
         </ButtonGroup>
       </Panel>

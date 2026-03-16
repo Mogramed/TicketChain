@@ -12,14 +12,17 @@ export function NotFoundPage() {
         <Card>
           <p>Choose one of the main flows to continue.</p>
           <div className="inline-actions">
-            <Link to="/app/fan" className="button-link primary">
-              Go to Buy
+            <Link to="/app/explore" className="button-link primary">
+              Go to Explore
             </Link>
-            <Link to="/app/market" className="button-link ghost">
-              Go to Resale
+            <Link to="/app/marketplace" className="button-link ghost">
+              Go to Marketplace
             </Link>
             <Link to="/app/tickets" className="button-link ghost">
               Go to Tickets
+            </Link>
+            <Link to="/app/organizer" className="button-link ghost">
+              Go to Organizer
             </Link>
           </div>
         </Card>

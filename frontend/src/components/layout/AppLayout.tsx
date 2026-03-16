@@ -1,29 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useI18n } from "../../i18n/I18nContext";
 import { formatAddress, formatEventStart } from "../../lib/format";
-import { useAppState } from "../../state/useAppState";
-import { EventDemoNotice } from "../events/EventDemoNotice";
-import { EventPoster } from "../events/EventPoster";
+import { getWorkspacePresentation } from "../../lib/workspaceContent";
 import {
-  Badge,
-  ButtonGroup,
-  Panel,
-  RiskBanner,
-  Toast,
-  Tag,
-} from "../ui/Primitives";
-import { GlobalGuideBar } from "./GlobalGuideBar";
+  ORGANIZER_SUBROUTE_PATHS,
+  resolveOrganizerSubroute,
+  resolveWorkspace,
+  WORKSPACE_CONFIGS,
+} from "../../lib/workspaceRouting";
+import { useAppState } from "../../state/useAppState";
+import { EventPoster } from "../events/EventPoster";
+import { Badge, ButtonGroup, RiskBanner, Tag, Toast } from "../ui/Primitives";
 import { OnboardingGuide } from "./OnboardingGuide";
 import { TransactionPreviewDrawer } from "./TransactionPreviewDrawer";
-
-interface NavigationItem {
-  to: string;
-  label: string;
-  eyebrow: string;
-  description: string;
-}
 
 function useIsMobileBreakpoint(maxWidth: number): boolean {
   const mediaQuery = `(max-width: ${maxWidth}px)`;
@@ -63,6 +54,7 @@ function useIsMobileBreakpoint(maxWidth: number): boolean {
     } else {
       media.addListener(onChange);
     }
+
     return () => {
       if (typeof media.removeEventListener === "function") {
         media.removeEventListener("change", onChange);
@@ -75,8 +67,19 @@ function useIsMobileBreakpoint(maxWidth: number): boolean {
   return isMobile;
 }
 
+function selectedEventLocation(event: {
+  venueName?: string | null;
+  city?: string | null;
+  countryCode?: string | null;
+} | null): string {
+  if (!event) {
+    return "";
+  }
+  return [event.venueName, event.city, event.countryCode].filter(Boolean).join(" | ");
+}
+
 export function AppLayout() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const {
     walletProviders,
     selectedProviderId,
@@ -102,122 +105,183 @@ export function AppLayout() {
     systemState,
     walletCapRemaining,
     venueSafeMode,
-    uiMode,
+    userRoles,
   } = useAppState();
-
+  const navigate = useNavigate();
+  const location = useLocation();
   const isMobile = useIsMobileBreakpoint(940);
 
-  const navigation = useMemo<NavigationItem[]>(
-    () => [
-      {
-        to: "/app/fan",
-        label: t("navBuy"),
-        eyebrow: "Primary",
-        description: "Mint the first-party pass with preflight checks.",
-      },
-      {
-        to: "/app/market",
-        label: t("navResale"),
-        eyebrow: "Marketplace",
-        description: "Explore capped resale inventory with transparent pricing.",
-      },
-      {
-        to: "/app/tickets",
-        label: t("navMyTickets"),
-        eyebrow: "Wallet",
-        description: "Open the pass, QR entry, and collectible preview.",
-      },
-      {
-        to: "/app/advanced",
-        label: t("navAdvanced"),
-        eyebrow: "Operations",
-        description: "Scanner, organizer controls, and advanced diagnostics.",
-      },
-    ],
-    [t],
-  );
-  const selectedEvent = useMemo(
-    () =>
-      availableEvents.find((event) => event.ticketEventId === selectedEventId) ??
-      availableEvents[0] ??
-      null,
-    [availableEvents, selectedEventId],
-  );
-
+  const workspace = resolveWorkspace(location.pathname);
+  const organizerSubroute = resolveOrganizerSubroute(location.pathname);
+  const workspacePresentationMap = getWorkspacePresentation(locale);
+  const workspacePresentation = workspacePresentationMap[workspace];
+  const topbarCopy =
+    locale === "fr"
+      ? {
+          brandTagline: "Billetterie de confiance",
+          selectedEvent: "Evenement en focus",
+          dedicatedOps: "Surface ops dediee",
+          viewEvent: "Voir l'evenement",
+          noOpsRole: "Aucun role ops",
+          availableEvents: "Evenements disponibles",
+          walletProvider: "Provider wallet",
+        }
+      : {
+          brandTagline: "Trusted ticketing",
+          selectedEvent: "Selected event",
+          dedicatedOps: "Dedicated ops surface",
+          viewEvent: "View event",
+          noOpsRole: "No ops role",
+          availableEvents: "Available events",
+          walletProvider: "Wallet provider",
+        };
+  const currentEvent =
+    availableEvents.find((event) => event.ticketEventId === selectedEventId) ??
+    availableEvents[0] ??
+    null;
   const walletStatusTone = walletChainId === contractConfig.chainId ? "success" : "warning";
+  const mainNavigation = useMemo(
+    () =>
+      [
+        {
+          key: "explore",
+          to: WORKSPACE_CONFIGS.explore.path,
+          label: getWorkspacePresentation(locale).explore.label,
+        },
+        {
+          key: "marketplace",
+          to: WORKSPACE_CONFIGS.marketplace.path,
+          label: getWorkspacePresentation(locale).marketplace.label,
+        },
+        {
+          key: "tickets",
+          to: WORKSPACE_CONFIGS.tickets.path,
+          label: getWorkspacePresentation(locale).tickets.label,
+        },
+        {
+          key: "organizer",
+          to: WORKSPACE_CONFIGS.organizer.path,
+          label: getWorkspacePresentation(locale).organizer.label,
+        },
+      ] as const,
+    [locale],
+  );
+  const organizerNavigation = useMemo(
+    () =>
+      [
+        {
+          key: "overview",
+          to: ORGANIZER_SUBROUTE_PATHS.overview,
+          label: locale === "fr" ? "Cockpit" : "Cockpit",
+        },
+        {
+          key: "scanner",
+          to: ORGANIZER_SUBROUTE_PATHS.scanner,
+          label: locale === "fr" ? "Scanner Mode" : "Scanner Mode",
+        },
+        {
+          key: "sales",
+          to: ORGANIZER_SUBROUTE_PATHS.sales,
+          label: locale === "fr" ? "Ventes & revente" : "Sales & Resale",
+        },
+        {
+          key: "settings",
+          to: ORGANIZER_SUBROUTE_PATHS.settings,
+          label: locale === "fr" ? "Parametres" : "Settings",
+        },
+      ] as const,
+    [locale],
+  );
+  const roleTags = useMemo(() => {
+    const tags: string[] = [];
+    if (userRoles.isAdmin) {
+      tags.push(locale === "fr" ? "Admin gouvernance" : "Governance admin");
+    }
+    if (userRoles.isScannerAdmin) {
+      tags.push(locale === "fr" ? "Admin scanner" : "Scanner admin");
+    }
+    if (userRoles.isPauser) {
+      tags.push(locale === "fr" ? "Role pause" : "Pauser");
+    }
+    if (userRoles.isScanner) {
+      tags.push(locale === "fr" ? "Scanner terrain" : "Scanner");
+    }
+    return tags;
+  }, [locale, userRoles.isAdmin, userRoles.isPauser, userRoles.isScanner, userRoles.isScannerAdmin]);
+
+  const handleEventSwitch = (eventId: string) => {
+    setSelectedEventId(eventId);
+    if (workspace === "explore") {
+      void navigate(`/app/explore/${eventId}`);
+    }
+  };
 
   return (
-    <div className={venueSafeMode ? "arena-page venue-safe" : "arena-page"}>
+    <div
+      className={[
+        "workspace-page",
+        `workspace-${workspace}`,
+        `workspace-accent-${WORKSPACE_CONFIGS[workspace].accent}`,
+        venueSafeMode ? "venue-safe" : undefined,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <a className="skip-link" href="#main-content">
         {t("skipToContent")}
       </a>
-      <div className="arena-glow arena-glow-a" aria-hidden="true" />
-      <div className="arena-glow arena-glow-b" aria-hidden="true" />
-      <div className="arena-grid-pattern" aria-hidden="true" />
+      <div className="workspace-glow workspace-glow-a" aria-hidden="true" />
+      <div className="workspace-glow workspace-glow-b" aria-hidden="true" />
+      <div className="workspace-grid-pattern" aria-hidden="true" />
 
-      <div className="arena-shell">
-        {!isMobile ? (
-          <aside className="arena-rail" aria-label="Primary navigation">
-            <div className="arena-brand">
-              <p>{t("appEyebrow")}</p>
-              <h1>ChainTicket</h1>
-              <span>Investor demo for modern ticketing and collectibles</span>
+      <div className="workspace-shell">
+        <header className="workspace-topbar">
+          <div className="workspace-topbar-primary">
+            <div className="workspace-brand-lockup">
+              <Link to={WORKSPACE_CONFIGS.explore.path} className="workspace-brand-mark">
+                <span>CT</span>
+              </Link>
+              <div className="workspace-brand-copy">
+                <p>ChainTicket</p>
+                <strong>{topbarCopy.brandTagline}</strong>
+              </div>
             </div>
 
-            <nav className="arena-rail-nav">
-              {navigation.map((item) => (
+            <nav className="workspace-main-nav" aria-label="Primary navigation">
+              {mainNavigation.map((item) => (
                 <NavLink
-                  key={item.to}
+                  key={item.key}
                   to={item.to}
                   className={({ isActive }) =>
-                    isActive ? "rail-link active" : "rail-link"
+                    isActive ? "workspace-main-link active" : "workspace-main-link"
                   }
                 >
-                  <div className="rail-link-copy">
-                    <small>{item.eyebrow}</small>
-                    <strong>{item.label}</strong>
-                    <span>{item.description}</span>
-                  </div>
+                  {item.label}
                 </NavLink>
               ))}
             </nav>
+          </div>
 
-            <Panel className="rail-meta">
-              <p className="rail-meta-title">{t("network")}</p>
-              <Badge tone={walletStatusTone}>
-                {walletChainId === contractConfig.chainId
-                  ? contractConfig.chainName
-                  : t("networkNotConnected")}
-              </Badge>
-              <p className="rail-meta-caption">{t("rulesText")}</p>
-            </Panel>
-          </aside>
-        ) : null}
-
-        <main className="arena-main" id="main-content">
-          <header className="utility-bar">
-            <div className="utility-left">
+          <div className="workspace-utility-cluster">
+            <div className="workspace-network-chip">
               <Badge tone={walletStatusTone}>
                 {walletChainId === contractConfig.chainId
                   ? t("networkSecure", { chainName: contractConfig.chainName })
                   : t("networkNotConnected")}
               </Badge>
-              <Tag tone="default">{contractConfig.eventName ?? contractConfig.eventId ?? "Event"}</Tag>
-              <span className="utility-wallet">
+              <span className="workspace-wallet-text">
                 {walletAddress ? formatAddress(walletAddress, 6) : t("networkNotConnected")}
               </span>
             </div>
 
             <ButtonGroup compact>
               <select
-                className="wallet-select"
+                className="wallet-select workspace-provider-select"
                 value={selectedProviderId}
                 onChange={(event) => setSelectedProviderId(event.target.value)}
-                aria-label="Wallet provider"
+                aria-label={topbarCopy.walletProvider}
               >
-                {walletProviders.length === 0 ? (
-                  <option value="">{t("noWalletFound")}</option>
-                ) : null}
+                {walletProviders.length === 0 ? <option value="">{t("noWalletFound")}</option> : null}
                 {walletProviders.map((provider) => (
                   <option key={provider.id} value={provider.id}>
                     {provider.name}
@@ -241,136 +305,180 @@ export function AppLayout() {
                   {t("disconnectWallet")}
                 </button>
               ) : null}
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => void refreshDashboard()}
-              >
+              <button type="button" className="ghost" onClick={() => void refreshDashboard()}>
                 {isRefreshing ? t("refreshing") : t("refresh")}
               </button>
             </ButtonGroup>
-          </header>
+          </div>
+        </header>
 
-          <section className="experience-banner" role="status" aria-live="polite">
-            <div className="experience-banner-copy">
-              <p className="global-guide-eyebrow">Event spotlight</p>
-              <h2>{selectedEvent?.name ?? contractConfig.eventName ?? contractConfig.eventId ?? "ChainTicket event"}</h2>
-              <p>
-                Ticketing confidence inspired by modern mobile entry flows, with a collectible reveal
-                narrative layered on top of the NFT.
-              </p>
-              <div className="experience-banner-facts">
-                <strong>{formatEventStart(selectedEvent?.startsAt)}</strong>
-                <span>
-                  {[selectedEvent?.venueName, selectedEvent?.city, selectedEvent?.countryCode]
-                    .filter(Boolean)
-                    .join(" · ") || selectedEvent?.ticketEventId || "ChainTicket live event"}
-                </span>
-                {selectedEvent?.category ? <span>{selectedEvent.category}</span> : null}
-              </div>
-            </div>
-            <div className="experience-banner-meta">
+        <section
+          className={[
+            "workspace-hero",
+            workspace === "explore" ? undefined : "workspace-hero-compact",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <div className="workspace-hero-copy">
+            <p className="workspace-hero-eyebrow">{workspacePresentation.eyebrow}</p>
+            <h1>{workspacePresentation.label}</h1>
+            <p>{workspacePresentation.summary}</p>
+            <div className="workspace-hero-meta">
               <Tag tone={systemState?.paused ? "danger" : "success"}>
-                {t("systemPause")}: {systemState?.paused ? t("enabled") : t("disabled")}
+                {locale === "fr" ? "System" : "System"}:{" "}
+                {systemState?.paused ? t("paused") : t("active")}
               </Tag>
               <Tag tone={systemState?.collectibleMode ? "info" : "default"}>
                 {t("collectibleMode")}: {systemState?.collectibleMode ? t("enabled") : t("disabled")}
               </Tag>
               <Tag tone="info">
-                {t("walletCapRemaining")}:{" "}
-                {walletCapRemaining !== null ? walletCapRemaining.toString() : "-"}
+                {t("walletCapRemaining")}: {walletCapRemaining !== null ? walletCapRemaining.toString() : "-"}
               </Tag>
-              <Tag tone="default">Mode: {uiMode === "guide" ? t("uiModeGuide") : t("uiModeAdvanced")}</Tag>
-              <Link to="/app/tickets" className="button-link ghost compact-link">
-                Open passes
-              </Link>
+              {workspace === "explore" && currentEvent?.category ? (
+                <Tag tone="default">{currentEvent.category}</Tag>
+              ) : null}
             </div>
-            {selectedEvent ? (
-              <div className="experience-banner-visual">
-                <EventPoster event={selectedEvent} className="experience-poster" />
+          </div>
+
+          {workspace === "organizer" ? (
+            <div className="workspace-hero-side workspace-hero-side-ops">
+              <div className="workspace-ops-snapshot">
+                <small>{topbarCopy.selectedEvent}</small>
+                <strong>{currentEvent?.name ?? contractConfig.eventName ?? "ChainTicket"}</strong>
+                <span>
+                  {selectedEventLocation(currentEvent) ||
+                    topbarCopy.dedicatedOps}
+                </span>
               </div>
+              <div className="workspace-role-row">
+                {roleTags.length === 0 ? (
+                  <Tag tone="warning">{topbarCopy.noOpsRole}</Tag>
+                ) : (
+                  roleTags.map((role) => (
+                    <Tag key={role} tone="info">
+                      {role}
+                    </Tag>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : currentEvent ? (
+            <div className="workspace-hero-side">
+              <div className="workspace-event-card">
+                <EventPoster event={currentEvent} className="workspace-event-poster" />
+                <div className="workspace-event-copy">
+                  <small>{topbarCopy.selectedEvent}</small>
+                  <strong>{currentEvent.name}</strong>
+                  <span>{formatEventStart(currentEvent.startsAt)}</span>
+                  <em>{selectedEventLocation(currentEvent) || currentEvent.ticketEventId}</em>
+                  <Link
+                    to={`/app/explore/${currentEvent.ticketEventId}`}
+                    className="button-link ghost compact-link"
+                  >
+                    {topbarCopy.viewEvent}
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </section>
+
+        {availableEvents.length > 1 ? (
+          <section className="workspace-event-strip" aria-label={topbarCopy.availableEvents}>
+            {availableEvents.map((event) => (
+              <button
+                key={event.ticketEventId}
+                type="button"
+                className={event.ticketEventId === selectedEventId ? "workspace-event-pill active" : "workspace-event-pill"}
+                onClick={() => handleEventSwitch(event.ticketEventId)}
+              >
+                <strong>{event.name}</strong>
+                <span>{formatEventStart(event.startsAt)}</span>
+              </button>
+            ))}
+          </section>
+        ) : null}
+
+        {workspace === "organizer" ? (
+          <nav className="workspace-subnav" aria-label="Organizer navigation">
+            {organizerNavigation.map((item) => (
+              <NavLink
+                key={item.key}
+                to={item.to}
+                end={item.key === "overview"}
+                className={item.key === organizerSubroute ? "workspace-subnav-link active" : "workspace-subnav-link"}
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        ) : null}
+
+        {statusMessage || errorMessage ? (
+          <section className="status-stack" aria-live="polite">
+            {statusMessage ? (
+              <Toast tone="success" title={t("toastSuccessTitle")} message={statusMessage} />
+            ) : null}
+            {errorMessage ? (
+              <Toast tone="danger" title={t("toastErrorTitle")} message={errorMessage} />
             ) : null}
           </section>
+        ) : null}
 
-          <EventDemoNotice event={selectedEvent} compact />
+        {!hasValidConfig ? (
+          <RiskBanner
+            tone="error"
+            title={locale === "fr" ? "Configuration frontend bloquante" : "Frontend configuration blocked"}
+            cause={configIssues.join(" | ")}
+            impact={
+              locale === "fr"
+                ? "Le wallet et les lectures on-chain restent indisponibles tant que l'environnement est incomplet."
+                : "Wallet and on-chain reads stay unavailable until the environment is corrected."
+            }
+            action={
+              locale === "fr"
+                ? "Mettez a jour frontend/.env avec les variables VITE_* puis relancez l'application."
+                : "Update frontend/.env with VITE_* keys, then restart the app."
+            }
+          />
+        ) : null}
 
-          {availableEvents.length > 1 ? (
-            <section className="event-switcher" aria-label="Available events">
-              {availableEvents.map((event) => (
-                <button
-                  key={event.ticketEventId}
-                  type="button"
-                  className={
-                    event.ticketEventId === selectedEventId
-                      ? "event-switch-card active"
-                      : "event-switch-card"
-                  }
-                  onClick={() => setSelectedEventId(event.ticketEventId)}
-                >
-                  <EventPoster event={event} className="event-switch-poster" />
-                  <div className="event-switch-copy">
-                    <span>{event.symbol}</span>
-                    <strong>{event.name}</strong>
-                    <small>{formatEventStart(event.startsAt)}</small>
-                    <small>
-                      {[event.city, event.countryCode].filter(Boolean).join(", ") || event.ticketEventId}
-                    </small>
-                    <em>{event.category ?? event.ticketEventId}</em>
-                  </div>
-                </button>
-              ))}
-            </section>
-          ) : null}
+        {hasValidConfig && runtimeConfig.apiBaseUrl && indexedReadsIssue ? (
+          <RiskBanner
+            tone={bffMode === "offline" ? "error" : "warning"}
+            title={locale === "fr" ? "Lectures indexees indisponibles" : "Indexed reads unavailable"}
+            cause={indexedReadsIssue}
+            impact={
+              locale === "fr"
+                ? "Les vues enrichies du marche, des billets et de l'ops restent degradees jusqu'au rattrapage du BFF."
+                : "Enriched marketplace, tickets, and ops views stay degraded until the BFF catches up."
+            }
+            action={
+              locale === "fr"
+                ? "Gardez le BFF actif, confirmez le deployment block, puis laissez l'indexation finir."
+                : "Keep the BFF running, confirm the deployment block, and let indexing catch up."
+            }
+          />
+        ) : null}
 
-          <GlobalGuideBar />
-
-          {statusMessage || errorMessage ? (
-            <section className="status-stack" aria-live="polite">
-              {statusMessage ? (
-                <Toast tone="success" title={t("toastSuccessTitle")} message={statusMessage} />
-              ) : null}
-              {errorMessage ? (
-                <Toast tone="danger" title={t("toastErrorTitle")} message={errorMessage} />
-              ) : null}
-            </section>
-          ) : null}
-
-          {!hasValidConfig ? (
-            <RiskBanner
-              tone="error"
-              title="Frontend configuration blocked"
-              cause={configIssues.join(" | ")}
-              impact="Wallet and on-chain reads are unavailable until environment variables are corrected."
-              action="Update frontend/.env using VITE_* keys only, then restart the app."
-            />
-          ) : null}
-
-          {hasValidConfig && runtimeConfig.apiBaseUrl && indexedReadsIssue ? (
-            <RiskBanner
-              tone={bffMode === "offline" ? "error" : "warning"}
-              title="Backend indexed reads unavailable"
-              cause={indexedReadsIssue}
-              impact="Market listings, owned tickets, timelines, and live indexed views stay unavailable until the BFF is ready."
-              action="Keep the BFF running, confirm DEPLOYMENT_BLOCK matches the deployed contracts, and wait for the indexer to catch up."
-            />
-          ) : null}
-
-          <section className="workspace-shell">
+        <main className="workspace-content-shell" id="main-content">
+          <section className="workspace-content">
             <Outlet />
           </section>
         </main>
       </div>
 
-          {isMobile ? (
+      {isMobile ? (
         <nav className="bottom-nav" aria-label="Primary mobile navigation">
-          {navigation.map((item) => (
+          {mainNavigation.map((item) => (
             <NavLink
-              key={item.to}
+              key={item.key}
               to={item.to}
               className={({ isActive }) => (isActive ? "bottom-link active" : "bottom-link")}
             >
               <span className="bottom-glyph" aria-hidden="true">
-                {item.eyebrow.slice(0, 1)}
+                {item.label.slice(0, 1)}
               </span>
               <span>{item.label}</span>
             </NavLink>

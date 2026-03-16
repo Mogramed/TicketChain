@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import {
   Badge,
   ButtonGroup,
@@ -9,7 +11,6 @@ import {
   SegmentedToggle,
   Tag,
 } from "../components/ui/Primitives";
-import { Link } from "react-router-dom";
 import { useI18n } from "../i18n/I18nContext";
 import { useAppState } from "../state/useAppState";
 
@@ -28,10 +29,10 @@ export function SettingsPage() {
 
   const roleBadges: string[] = [];
   if (userRoles.isAdmin) {
-    roleBadges.push("Governance admin");
+    roleBadges.push(locale === "fr" ? "Admin gouvernance" : "Governance admin");
   }
   if (userRoles.isScannerAdmin) {
-    roleBadges.push("Scanner admin");
+    roleBadges.push(locale === "fr" ? "Admin scanner" : "Scanner admin");
   }
   if (userRoles.isPauser) {
     roleBadges.push(t("rolePauser"));
@@ -43,21 +44,34 @@ export function SettingsPage() {
   return (
     <div className="route-stack settings-route" data-testid="settings-page">
       <PageHeader
-        title={t("settingsTitle")}
-        subtitle="Display, safety, and environment settings for operational readiness."
-        context={<Badge tone="info">Corporate clarity profile active</Badge>}
+        title={locale === "fr" ? "Parametres Organizer" : "Organizer settings"}
+        subtitle={
+          locale === "fr"
+            ? "Le flux fan reste propre pendant que les reglages de langue, de securite et de diagnostic vivent cote ops."
+            : "Fan-facing flows stay clean while language, safety, and diagnostic controls live on the ops side."
+        }
+        workspace="organizer"
+        context={
+          <Badge tone="info" emphasis="solid">
+            {locale === "fr" ? "Profil ops" : "Operations profile"}
+          </Badge>
+        }
         secondaryActions={
-          <Link to="/app/advanced" className="button-link ghost">
-            {t("navAdvanced")}
+          <Link to="/app/organizer" className="button-link ghost">
+            Organizer Cockpit
           </Link>
         }
       />
 
-      <Panel className="primary-panel">
+      <Panel className="primary-panel" surface="glass">
         <section className="settings-grid">
-          <Card>
-            <h3>Language and display</h3>
-            <p>Select the language used across all pages and transaction copy.</p>
+          <Card surface="accent">
+            <h3>{locale === "fr" ? "Langue et affichage" : "Language and display"}</h3>
+            <p>
+              {locale === "fr"
+                ? "Choisissez la langue de toutes les pages et le niveau d'accompagnement voulu dans l'interface."
+                : "Select the language used across all pages and choose how guided the workspace should feel."}
+            </p>
             <SegmentedToggle<"fr" | "en">
               value={locale}
               onChange={setLocale}
@@ -82,8 +96,8 @@ export function SettingsPage() {
             </ButtonGroup>
           </Card>
 
-          <Card>
-            <h3>Safety</h3>
+          <Card surface="glass">
+            <h3>{locale === "fr" ? "Securite" : "Safety"}</h3>
             <p>{t("venueSafeHint")}</p>
             <ButtonGroup>
               <button
@@ -104,27 +118,24 @@ export function SettingsPage() {
             </div>
           </Card>
 
-          <Card>
-            <h3>Environment</h3>
+          <Card surface="glass">
+            <h3>{locale === "fr" ? "Environnement" : "Environment"}</h3>
             <InfoList
               entries={[
                 { label: t("chainEnv"), value: runtimeConfig.chainEnv },
-                { label: t("apiBaseUrl"), value: runtimeConfig.apiBaseUrl ?? "Not configured" },
+                { label: t("apiBaseUrl"), value: runtimeConfig.apiBaseUrl ?? (locale === "fr" ? "Non configure" : "Not configured") },
                 {
-                  label: "Governance timelock",
-                  value: runtimeConfig.governanceTimelockAddress ?? "Not configured",
+                  label: locale === "fr" ? "Timelock de gouvernance" : "Governance timelock",
+                  value: runtimeConfig.governanceTimelockAddress ?? (locale === "fr" ? "Non configure" : "Not configured"),
                 },
+                { label: locale === "fr" ? "Delai de gouvernance" : "Governance delay", value: `${runtimeConfig.governanceMinDelaySeconds}s` },
                 {
-                  label: "Governance delay",
-                  value: `${runtimeConfig.governanceMinDelaySeconds}s`,
-                },
-                {
-                  label: "Governance portal",
-                  value: runtimeConfig.governancePortalUrl ?? "Not configured",
+                  label: locale === "fr" ? "Portail de gouvernance" : "Governance portal",
+                  value: runtimeConfig.governancePortalUrl ?? (locale === "fr" ? "Non configure" : "Not configured"),
                 },
                 {
                   label: t("featureFlags"),
-                  value: runtimeConfig.featureFlags.length ? runtimeConfig.featureFlags.join(", ") : "None",
+                  value: runtimeConfig.featureFlags.length ? runtimeConfig.featureFlags.join(", ") : locale === "fr" ? "Aucun" : "None",
                 },
                 { label: t("fallbackMode"), value: bffMode },
               ]}
@@ -134,14 +145,22 @@ export function SettingsPage() {
       </Panel>
 
       <DetailAccordion
-        title="Environment notes"
-        subtitle="Read before changing deployment configuration"
+        title={locale === "fr" ? "Notes environnement" : "Environment notes"}
+        subtitle={locale === "fr" ? "A lire avant de modifier la configuration de deploiement" : "Read before changing deployment configuration"}
         defaultOpenDesktop={uiMode === "advanced"}
       >
         <ul className="plain-list">
           <li>{t("fallbackModeHint")}</li>
-          <li>Feature flags are read-only in this UI and controlled by environment variables.</li>
-          <li>Role badges update automatically when wallet account changes.</li>
+          <li>
+            {locale === "fr"
+              ? "Les feature flags sont en lecture seule dans cette UI et controles par les variables d'environnement."
+              : "Feature flags are read-only in this UI and controlled by environment variables."}
+          </li>
+          <li>
+            {locale === "fr"
+              ? "Les badges de roles se mettent a jour automatiquement quand le compte wallet change."
+              : "Role badges update automatically when wallet account changes."}
+          </li>
         </ul>
       </DetailAccordion>
     </div>

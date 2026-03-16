@@ -5,7 +5,7 @@ import type { EventDeployment } from "../../types/chainticket";
 
 function buildPosterMeta(event: EventDeployment): string {
   const parts = [formatEventStart(event.startsAt), event.city, event.countryCode].filter(Boolean);
-  return parts.join(" · ");
+  return parts.join(" | ");
 }
 
 export function EventPoster({

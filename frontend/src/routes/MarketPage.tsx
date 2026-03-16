@@ -1,16 +1,15 @@
 import { useDeferredValue, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 import {
   ActionBar,
   Badge,
   ButtonGroup,
   Card,
-  DetailAccordion,
   EmptyState,
   InfoList,
   PageHeader,
   Panel,
-  RiskBanner,
   SectionHeader,
   SegmentedToggle,
   Tag,
@@ -31,8 +30,18 @@ function listingIsMine(listing: MarketplaceView, walletAddress: string): boolean
   return walletAddress.length > 0 && listing.seller.toLowerCase() === walletAddress.toLowerCase();
 }
 
+function minBigInt(left: bigint | null, right: bigint | null): bigint | null {
+  if (left === null) {
+    return right;
+  }
+  if (right === null) {
+    return left;
+  }
+  return left < right ? left : right;
+}
+
 export function MarketPage() {
-  const { t } = useI18n();
+  const { locale } = useI18n();
   const {
     listings,
     marketStats,
@@ -44,7 +53,6 @@ export function MarketPage() {
     setErrorMessage,
     watchlist,
     toggleWatch,
-    uiMode,
     pendingPreview,
     indexedReadsAvailable,
     availableEvents,
@@ -63,6 +71,193 @@ export function MarketPage() {
   const [sortMode, setSortMode] = useState<MarketSortMode>("price_asc");
   const deferredSearchInput = useDeferredValue(searchInput);
   const deferredListings = useDeferredValue(listings);
+
+  const copy =
+    locale === "fr"
+      ? {
+          title: "Official Resale Market",
+          subtitle:
+            "Un workspace plus dense et plus lisible pour la revente officielle: prix plancher, fair range, primaire vs secondaire et creation de listing sans ambiguite.",
+          primaryBridge: "Le primaire vit sur la page evenement",
+          primaryBridgeBody:
+            "Le primaire convertit depuis le detail evenement. Le marketplace reste concentre sur la lecture du marche secondaire et les actions de revente.",
+          goEvent: "Ouvrir le detail evenement",
+          startListing: "Commencer une mise en vente",
+          listingTitle: "Creer ou mettre a jour une annonce",
+          listingBody:
+            "Le flow one-step conserve la logique permit existante, mais la surface explique maintenant clairement quand vous vendez, a quel prix, et sous quelle discipline.",
+          searchLabel: "Rechercher une annonce",
+          filtersTitle: "Signaux du marche",
+          filtersSubtitle: "Le marche secondaire doit sembler propre, pas opaque.",
+          fairRange: "Zone de prix juste",
+          activeTitle: "Inventaire de revente live",
+          activeSubtitle: "Annonces actives avec lecture immediate du prix et du statut.",
+          emptyTitle: "Aucune annonce visible",
+          emptyDescription: "Soit le marche est vide, soit les filtres actuels cachent l'inventaire disponible.",
+          myTickets: "My Tickets",
+          listingsCount: "annonce(s)",
+          capMissing: "Cap indisponible",
+          floor: "Floor",
+          median: "Mediane",
+          primaryCap: "Cap primaire",
+          cardView: "Cartes",
+          tableView: "Tableau",
+          searchPlaceholder: "tokenId ou vendeur",
+          tokenLabel: "Token ID",
+          priceLabel: "Prix de vente (POL)",
+          approvalButton: "Approbation manuelle",
+          oneStepButton: "Mise en vente one-step",
+          cancelButton: "Annuler l'annonce",
+          sortLabel: "Tri",
+          filterLabel: "Filtre",
+          sortPriceAsc: "Prix croissant",
+          sortPriceDesc: "Prix decroissant",
+          sortRecent: "Plus recent",
+          filterAll: "Tout",
+          filterMine: "Mes annonces",
+          filterOpen: "Annonces ouvertes",
+          selectedTicket: "Billet selectionne",
+          ticketMissing: "Billet introuvable dans votre vue wallet.",
+          ticketPrompt: "Choisissez l'un de vos billets pour commencer.",
+          ticketState: "Etat du billet",
+          alreadyUsed: "Deja utilise",
+          alreadyListed: "Deja en vente",
+          readyForResale: "Pret pour la revente",
+          livePrecheck: "Pre-check live",
+          precheckPrompt: "Lancez une action marche pour voir un pre-check frais.",
+          safeToSign: "Pret a signer.",
+          connectWallet: "Connectez un wallet pour signer un achat ou publier une annonce.",
+          ownedByYou: "A vous",
+          openListing: "Annonce ouverte",
+          sellerPrefix: "Vendeur",
+          capPending: "Cap en attente",
+          fairPending: "Zone juste en attente",
+          aboveCap: "Au-dessus du cap",
+          withinCap: "Dans le cap",
+          yourListing: "Votre annonce",
+          buyResale: "Acheter en revente",
+          tokenHeader: "Token",
+          sellerHeader: "Vendeur",
+          priceHeader: "Prix",
+          fairHeader: "Zone juste",
+          statusHeader: "Statut",
+          actionsHeader: "Actions",
+          invalidToken: "Entrez un tokenId valide.",
+          priceCapExceeded: "Le prix depasse le cap primaire.",
+          approvePreviewLabel: "Approbation marketplace",
+          approvePreviewDescription: "Approuver le marketplace pour un token.",
+          approvePreviewDetails: ["Verification proprietaire", "Simulation approval", "Estimation gas"],
+          listPreviewLabel: "Creer une annonce one-step",
+          listPreviewDescription: "Creer une annonce secondaire plafonnee avec un permit ERC-4494.",
+          listPreviewDetails: [
+            "Demande une seule signature wallet pour le permit, puis soumet la transaction de listing.",
+            "Verifie la propriete sans exiger une transaction d'approbation prealable.",
+            "Controle le cap par rapport au prix primaire.",
+            "Lance les verifications anti-etat-obsolete.",
+          ],
+          cancelPreviewLabel: "Annuler l'annonce",
+          cancelPreviewDescription: "Annuler votre annonce secondaire actuelle.",
+          cancelPreviewDetails: ["Revalide l'annonce active", "Controle le vendeur", "Estime le gas"],
+          buyPreviewLabel: "Acheter un billet en revente",
+          buyPreviewDescription: "Acheter un billet secondaire avec protection contre les listings obsoletes.",
+          buyPreviewDetails: [
+            "Revalide vendeur et prix avant signature.",
+            "Controle le cap wallet acheteur.",
+            "Affiche l'impact de propriete attendu apres confirmation.",
+          ],
+        }
+      : {
+          title: "Official Resale Market",
+          subtitle:
+            "A denser, clearer resale workspace for official secondary inventory: floor price, fair range, primary vs secondary, and clean listing creation.",
+          primaryBridge: "Primary stays on the event page",
+          primaryBridgeBody:
+            "Primary purchase converts from event detail. Marketplace stays focused on reading secondary market health and performing resale actions.",
+          goEvent: "Open event detail",
+          startListing: "Start listing",
+          listingTitle: "Create or update listing",
+          listingBody:
+            "The one-step flow keeps the existing permit logic, but the surface now explains exactly when you sell, at what price, and under which discipline.",
+          searchLabel: "Search listing",
+          filtersTitle: "Market signal",
+          filtersSubtitle: "The secondary market should read clean, not opaque.",
+          fairRange: "Fair price range",
+          activeTitle: "Live resale inventory",
+          activeSubtitle: "Active listings with immediate reading of price and status.",
+          emptyTitle: "No visible listings",
+          emptyDescription: "Either the market is empty or the current filters are hiding the current inventory.",
+          myTickets: "My Tickets",
+          listingsCount: "listing(s)",
+          capMissing: "No cap data",
+          floor: "Floor",
+          median: "Median",
+          primaryCap: "Primary cap",
+          cardView: "Cards",
+          tableView: "Table",
+          searchPlaceholder: "tokenId or seller",
+          tokenLabel: "Token ID",
+          priceLabel: "Listing Price (POL)",
+          approvalButton: "Manual approval",
+          oneStepButton: "One-step listing",
+          cancelButton: "Cancel listing",
+          sortLabel: "Sort",
+          filterLabel: "Filter",
+          sortPriceAsc: "Price asc",
+          sortPriceDesc: "Price desc",
+          sortRecent: "Most recent",
+          filterAll: "All",
+          filterMine: "My listings",
+          filterOpen: "Open listings",
+          selectedTicket: "Selected ticket",
+          ticketMissing: "Ticket not found in your wallet view.",
+          ticketPrompt: "Choose one of your tickets to start.",
+          ticketState: "Ticket state",
+          alreadyUsed: "Already used",
+          alreadyListed: "Already listed",
+          readyForResale: "Ready for resale",
+          livePrecheck: "Live pre-check",
+          precheckPrompt: "Run a market action to see a fresh pre-check.",
+          safeToSign: "Safe to sign.",
+          connectWallet: "Connect a wallet to sign a purchase or publish a listing.",
+          ownedByYou: "Owned by you",
+          openListing: "Open listing",
+          sellerPrefix: "Seller",
+          capPending: "Cap pending",
+          fairPending: "Fair range pending",
+          aboveCap: "Above cap",
+          withinCap: "Within cap",
+          yourListing: "Your listing",
+          buyResale: "Buy resale",
+          tokenHeader: "Token",
+          sellerHeader: "Seller",
+          priceHeader: "Price",
+          fairHeader: "Fair range",
+          statusHeader: "Status",
+          actionsHeader: "Actions",
+          invalidToken: "Enter a valid tokenId.",
+          priceCapExceeded: "Price exceeds primary cap.",
+          approvePreviewLabel: "Approval for marketplace",
+          approvePreviewDescription: "Approve marketplace for one token.",
+          approvePreviewDetails: ["Owner check", "Approval simulation", "Gas estimate"],
+          listPreviewLabel: "Create one-step listing",
+          listPreviewDescription: "Create a capped resale listing with an ERC-4494 permit.",
+          listPreviewDetails: [
+            "Requests one wallet signature for the permit, then submits the listing transaction.",
+            "Verifies ownership without requiring a prior approval transaction.",
+            "Checks cap against primary price.",
+            "Runs anti-stale listing checks.",
+          ],
+          cancelPreviewLabel: "Cancel listing",
+          cancelPreviewDescription: "Cancel your current resale listing.",
+          cancelPreviewDetails: ["Revalidates active listing", "Checks seller ownership", "Estimates gas"],
+          buyPreviewLabel: "Buy resale ticket",
+          buyPreviewDescription: "Buy a secondary market ticket with stale-listing protection.",
+          buyPreviewDetails: [
+            "Revalidates seller and price before signature.",
+            "Checks buyer wallet cap.",
+            "Shows expected ownership impact after confirmation.",
+          ],
+        };
 
   const selectedToken = useMemo(() => parseTokenIdInput(selectedTokenId), [selectedTokenId]);
   const selectedOwnedTicket = useMemo(
@@ -86,6 +281,7 @@ export function MarketPage() {
       if (!normalizedSearch) {
         return true;
       }
+
       return (
         listing.tokenId.toString().includes(normalizedSearch) ||
         listing.seller.toLowerCase().includes(normalizedSearch)
@@ -119,18 +315,24 @@ export function MarketPage() {
     return pendingPreview.preflight;
   }, [pendingPreview]);
 
+  const fairBaseline = marketStats?.medianPrice ?? marketStats?.suggestedListPrice ?? systemState?.primaryPrice ?? null;
+  const fairLow = fairBaseline ? (fairBaseline * 9n) / 10n : null;
+  const fairHigh = fairBaseline
+    ? minBigInt((fairBaseline * 11n) / 10n, systemState?.primaryPrice ?? null)
+    : null;
+
   const onApproveSelected = async () => {
     const tokenId = parseTokenIdInput(selectedTokenId);
     if (tokenId === null) {
-      setErrorMessage("Enter a valid tokenId.");
+      setErrorMessage(copy.invalidToken);
       return;
     }
 
     await preparePreview({
-      label: "Approval for marketplace",
-      description: "Approve marketplace for one token.",
+      label: copy.approvePreviewLabel,
+      description: copy.approvePreviewDescription,
       action: { type: "approve", tokenId },
-      details: ["Owner check", "Approval simulation", "Gas estimate"],
+      details: copy.approvePreviewDetails,
       run: (client) => client.approveTicket(tokenId),
     });
   };
@@ -138,7 +340,7 @@ export function MarketPage() {
   const onListSelected = async () => {
     const tokenId = parseTokenIdInput(selectedTokenId);
     if (tokenId === null) {
-      setErrorMessage("Enter a valid tokenId.");
+      setErrorMessage(copy.invalidToken);
       return;
     }
 
@@ -149,20 +351,15 @@ export function MarketPage() {
     }
 
     if (systemState && parsedPrice.value > systemState.primaryPrice) {
-      setErrorMessage("Price exceeds primary cap.");
+      setErrorMessage(copy.priceCapExceeded);
       return;
     }
 
     await preparePreview({
-      label: "Create one-step listing",
-      description: "Create a capped resale listing with an ERC-4494 permit.",
+      label: copy.listPreviewLabel,
+      description: copy.listPreviewDescription,
       action: { type: "list_with_permit", tokenId, price: parsedPrice.value },
-      details: [
-        "Requests one wallet signature for the permit, then submits the listing transaction.",
-        "Verifies ownership without requiring a prior approval transaction.",
-        "Checks cap against primary price.",
-        "Runs anti-stale listing checks.",
-      ],
+      details: copy.listPreviewDetails,
       run: async (client) => {
         if (!client.listTicketWithPermit) {
           throw new Error("One-step permit listing is unavailable in this wallet client.");
@@ -175,82 +372,120 @@ export function MarketPage() {
   const onCancelSelected = async () => {
     const tokenId = parseTokenIdInput(selectedTokenId);
     if (tokenId === null) {
-      setErrorMessage("Enter a valid tokenId.");
+      setErrorMessage(copy.invalidToken);
       return;
     }
 
     await preparePreview({
-      label: "Cancel listing",
-      description: "Cancel your current resale listing.",
+      label: copy.cancelPreviewLabel,
+      description: copy.cancelPreviewDescription,
       action: { type: "cancel", tokenId, expectedSeller: walletAddress || undefined },
-      details: ["Revalidates active listing", "Checks seller ownership", "Estimates gas"],
+      details: copy.cancelPreviewDetails,
       run: (client) => client.cancelListing(tokenId),
     });
   };
 
   const onBuyListing = async (listing: MarketplaceView) => {
     await preparePreview({
-      label: "Buy resale ticket",
-      description: "Buy a secondary market ticket with stale-listing protection.",
+      label: copy.buyPreviewLabel,
+      description: copy.buyPreviewDescription,
       action: {
         type: "buy",
         tokenId: listing.tokenId,
         price: listing.price,
         expectedSeller: listing.seller,
       },
-      details: [
-        "Revalidates seller and price before signature.",
-        "Checks buyer wallet cap.",
-        "Shows expected ownership impact after confirmation.",
-      ],
+      details: copy.buyPreviewDetails,
       run: (client) => client.buyTicket(listing.tokenId, listing.price),
     });
   };
 
   return (
-    <div className="route-stack" data-testid="market-page">
+    <div className="route-stack market-route" data-testid="market-page">
       <PageHeader
-        title={t("marketTitle")}
-        subtitle="Secondary listing workflow with transparent filters and consistent transaction checks."
+        title={copy.title}
+        subtitle={copy.subtitle}
+        workspace="marketplace"
         context={
-          <Tag tone="info">{filteredListings.length} active listing(s)</Tag>
+          <div className="inline-actions">
+            <Tag tone="success">
+              {`${marketStats?.listingCount ?? filteredListings.length} ${copy.listingsCount}`}
+            </Tag>
+            <Tag tone="info">
+              {systemState?.primaryPrice ? `${formatPol(systemState.primaryPrice)} POL cap` : copy.capMissing}
+            </Tag>
+          </div>
         }
         primaryAction={
           <button type="button" className="primary" onClick={() => void onListSelected()}>
-            Start listing
+            {copy.startListing}
           </button>
-        }
-        secondaryActions={
-          <ButtonGroup>
-            <button
-              type="button"
-              className="ghost"
-              disabled={!marketStats?.suggestedListPrice}
-              onClick={() => {
-                if (!marketStats?.suggestedListPrice) {
-                  return;
-                }
-                setListingPriceInput(formatPol(marketStats.suggestedListPrice, 6));
-              }}
-            >
-              {t("useSuggestedPrice")}
-            </button>
-          </ButtonGroup>
         }
       />
 
+      <Panel className="market-context-panel" surface="glass">
+        <Card className="market-primary-bridge" surface="quiet">
+          <p className="eyebrow">{copy.primaryBridge}</p>
+          <h3>{selectedEvent?.name ?? contractConfig.eventName ?? "Current event"}</h3>
+          <p>{copy.primaryBridgeBody}</p>
+          <ButtonGroup>
+            <Link
+              to={`/app/explore/${selectedEvent?.ticketEventId ?? contractConfig.eventId ?? "main-event"}`}
+              className="button-link ghost"
+            >
+              {copy.goEvent}
+            </Link>
+            <Link to="/app/tickets" className="button-link ghost">
+              {copy.myTickets}
+            </Link>
+          </ButtonGroup>
+        </Card>
+
+        <div className="market-signal-grid">
+          <Card className="market-signal-card" surface="accent">
+            <span>{copy.floor}</span>
+            <strong>
+              {marketStats?.floorPrice !== null && marketStats?.floorPrice !== undefined
+                ? `${formatPol(marketStats.floorPrice)} POL`
+                : "-"}
+            </strong>
+          </Card>
+          <Card className="market-signal-card" surface="glass">
+            <span>{copy.fairRange}</span>
+            <strong>
+              {fairLow !== null && fairHigh !== null
+                ? `${formatPol(fairLow)} - ${formatPol(fairHigh)} POL`
+                : "-"}
+            </strong>
+          </Card>
+          <Card className="market-signal-card" surface="glass">
+            <span>{copy.median}</span>
+            <strong>
+              {marketStats?.medianPrice !== null && marketStats?.medianPrice !== undefined
+                ? `${formatPol(marketStats.medianPrice)} POL`
+                : "-"}
+            </strong>
+          </Card>
+          <Card className="market-signal-card" surface="glass">
+            <span>{copy.primaryCap}</span>
+            <strong>{systemState?.primaryPrice ? `${formatPol(systemState.primaryPrice)} POL` : "-"}</strong>
+          </Card>
+        </div>
+      </Panel>
+
       <EventDemoNotice event={selectedEvent} />
 
-      <Panel className="primary-panel">
+      <Panel className="market-listing-shell" surface="glass">
         <ActionBar
           className="market-action-bar"
+          surface="quiet"
           primary={
             <label>
-              Search listing
+              {copy.searchLabel}
               <input
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="tokenId or seller"
+                placeholder={copy.searchPlaceholder}
               />
             </label>
           }
@@ -259,163 +494,122 @@ export function MarketPage() {
               value={viewMode}
               onChange={setViewMode}
               options={[
-                { value: "card", label: "Card" },
-                { value: "table", label: "Table" },
+                { value: "card", label: copy.cardView },
+                { value: "table", label: copy.tableView },
               ]}
             />
           }
         />
 
-        <Card className="market-listing-card">
-          <h3>Create or update a listing</h3>
-          <p>Use the one-step permit flow to sign listing authority off-chain, then submit the on-chain listing.</p>
-          <section className="market-form">
-            <label>
-              {t("tokenId")}
-              <input
-                value={selectedTokenId}
-                onChange={(event) => setSelectedTokenId(event.target.value)}
-                placeholder="e.g. 12"
-                inputMode="numeric"
-              />
-            </label>
-            <label>
-              {t("listingPricePol")}
-              <input
-                value={listingPriceInput}
-                onChange={(event) => setListingPriceInput(event.target.value)}
-                placeholder="e.g. 0.08"
-              />
-            </label>
-          </section>
+        <div className="market-builder-grid">
+          <Card className="market-builder-card" surface="accent">
+            <h3>{copy.listingTitle}</h3>
+            <p>{copy.listingBody}</p>
+            <section className="market-form">
+              <label>
+                {copy.tokenLabel}
+                <input
+                  value={selectedTokenId}
+                  onChange={(event) => setSelectedTokenId(event.target.value)}
+                  placeholder="e.g. 12"
+                  inputMode="numeric"
+                />
+              </label>
+              <label>
+                {copy.priceLabel}
+                <input
+                  value={listingPriceInput}
+                  onChange={(event) => setListingPriceInput(event.target.value)}
+                  placeholder="e.g. 0.08"
+                />
+              </label>
+            </section>
+            <ButtonGroup>
+              <button type="button" className="ghost" onClick={() => void onApproveSelected()}>
+                {copy.approvalButton}
+              </button>
+              <button type="button" className="primary" onClick={() => void onListSelected()}>
+                {copy.oneStepButton}
+              </button>
+              <button type="button" className="ghost" onClick={() => void onCancelSelected()}>
+                {copy.cancelButton}
+              </button>
+            </ButtonGroup>
+          </Card>
 
-          <InfoList
-            entries={[
-              {
-                label: "Selected ticket",
-                value:
-                  selectedOwnedTicket === null
-                    ? selectedToken === null
-                      ? "Choose one of your tickets to start."
-                      : "Ticket not found in your wallet view."
-                    : `#${selectedOwnedTicket.tokenId.toString()}`,
-              },
-              {
-                label: "Ticket state",
-                value:
-                  selectedOwnedTicket === null
-                    ? "-"
-                    : selectedOwnedTicket.used
-                      ? "Already used"
-                      : selectedOwnedTicket.listed
-                        ? "Already listed"
-                        : "Ready for approval or listing",
-              },
-              {
-                label: "Recommended next step",
-                value:
-                  "Use one-step listing for the default flow, or keep manual approval as a fallback for strict wallets.",
-              },
-            ]}
-          />
-
-          <ButtonGroup>
-            <button type="button" className="ghost" onClick={() => void onApproveSelected()}>
-              Manual approval
-            </button>
-            <button type="button" className="primary" onClick={() => void onListSelected()}>
-              One-step listing
-            </button>
-            <button type="button" className="ghost" onClick={() => void onCancelSelected()}>
-              {t("cancelListing")}
-            </button>
-          </ButtonGroup>
-        </Card>
-
-        <DetailAccordion
-          title="Market filters and trust"
-          subtitle="Sort, filter, and verify pricing signals"
-          defaultOpenDesktop={uiMode === "advanced"}
-        >
-          <section className="market-toolbar-grid">
-            <label>
-              Sort
-              <select value={sortMode} onChange={(event) => setSortMode(event.target.value as MarketSortMode)}>
-                <option value="price_asc">Price asc</option>
-                <option value="price_desc">Price desc</option>
-                <option value="recent">Most recent</option>
-              </select>
-            </label>
-            <label>
-              Filter
-              <select
-                value={filterMode}
-                onChange={(event) => setFilterMode(event.target.value as MarketFilterMode)}
-              >
-                <option value="all">All</option>
-                <option value="mine">My listings</option>
-                <option value="open">Open listings</option>
-              </select>
-            </label>
-          </section>
-
-          <InfoList
-            entries={[
-              {
-                label: t("floorPrice"),
-                value: marketStats?.floorPrice ? `${formatPol(marketStats.floorPrice)} POL` : "-",
-              },
-              {
-                label: t("medianPrice"),
-                value: marketStats?.medianPrice ? `${formatPol(marketStats.medianPrice)} POL` : "-",
-              },
-              {
-                label: t("marketCapPrimary"),
-                value: systemState?.primaryPrice ? `${formatPol(systemState.primaryPrice)} POL` : "-",
-              },
-              {
-                label: t("marketPrecheckValidation"),
-                value: marketPreflight
-                  ? marketPreflight.ok
-                    ? t("preflightPassed")
-                    : t("preflightBlocked", { reasons: marketPreflight.blockers.join(" | ") })
-                  : t("marketPrecheckPending"),
-              },
-            ]}
-          />
-        </DetailAccordion>
+          <Card className="market-builder-card" surface="glass">
+            <SectionHeader title={copy.filtersTitle} subtitle={copy.filtersSubtitle} />
+            <div className="market-toolbar-grid">
+              <label>
+                {copy.sortLabel}
+                <select value={sortMode} onChange={(event) => setSortMode(event.target.value as MarketSortMode)}>
+                  <option value="price_asc">{copy.sortPriceAsc}</option>
+                  <option value="price_desc">{copy.sortPriceDesc}</option>
+                  <option value="recent">{copy.sortRecent}</option>
+                </select>
+              </label>
+              <label>
+                {copy.filterLabel}
+                <select value={filterMode} onChange={(event) => setFilterMode(event.target.value as MarketFilterMode)}>
+                  <option value="all">{copy.filterAll}</option>
+                  <option value="mine">{copy.filterMine}</option>
+                  <option value="open">{copy.filterOpen}</option>
+                </select>
+              </label>
+            </div>
+            <InfoList
+              entries={[
+                {
+                  label: copy.selectedTicket,
+                  value:
+                    selectedOwnedTicket === null
+                      ? selectedToken === null
+                        ? copy.ticketPrompt
+                        : copy.ticketMissing
+                      : `#${selectedOwnedTicket.tokenId.toString()}`,
+                },
+                {
+                  label: copy.ticketState,
+                  value:
+                    selectedOwnedTicket === null
+                      ? "-"
+                      : selectedOwnedTicket.used
+                        ? copy.alreadyUsed
+                        : selectedOwnedTicket.listed
+                          ? copy.alreadyListed
+                          : copy.readyForResale,
+                },
+                {
+                  label: copy.livePrecheck,
+                  value:
+                    marketPreflight === null
+                      ? copy.precheckPrompt
+                      : marketPreflight.ok
+                        ? copy.safeToSign
+                        : marketPreflight.blockers.join(" | "),
+                },
+              ]}
+            />
+          </Card>
+        </div>
       </Panel>
 
       {!walletAddress ? (
-        <RiskBanner
-          tone="warning"
-          title={t("emptyWalletTitle")}
-          cause={t("emptyWalletMarketCause")}
-          impact={t("emptyWalletMarketImpact")}
-          action={t("emptyWalletMarketAction")}
-        />
+        <Panel className="market-empty-bridge" surface="glass">
+          <p>{copy.connectWallet}</p>
+        </Panel>
       ) : null}
 
-      {!indexedReadsAvailable ? (
-        <IndexedReadinessBanner />
-      ) : null}
+      {!indexedReadsAvailable ? <IndexedReadinessBanner /> : null}
 
       {indexedReadsAvailable && filteredListings.length === 0 ? (
-        <EmptyState
-          title={t("emptyListingsTitle")}
-          description={t("emptyListingsReason")}
-          action={
-            <button type="button" className="ghost" onClick={() => setFilterMode("all")}>
-              {t("emptyListingsAction")}
-            </button>
-          }
-        />
+        <EmptyState title={copy.emptyTitle} description={copy.emptyDescription} />
       ) : null}
 
       {indexedReadsAvailable && filteredListings.length > 0 ? (
         <SectionHeader
-          title={t("marketAvailableListings")}
-          subtitle={t("marketAvailableListingsSubtitle")}
+          title={copy.activeTitle}
+          subtitle={copy.activeSubtitle}
           actions={<Tag tone="info">{filteredListings.length.toString()}</Tag>}
         />
       ) : null}
@@ -423,19 +617,30 @@ export function MarketPage() {
       {indexedReadsAvailable && viewMode === "card" ? (
         <section className="listing-grid">
           {filteredListings.map((listing) => (
-            <Card key={listing.tokenId.toString()} className="listing-card live-card">
+            <Card key={listing.tokenId.toString()} className="listing-card market-live-card" surface="glass">
               <header className="listing-head">
-                <h3>#{listing.tokenId.toString()}</h3>
+                <div>
+                  <p className="eyebrow">Token #{listing.tokenId.toString()}</p>
+                  <h3>{formatPol(listing.price)} POL</h3>
+                </div>
                 <Badge tone={listingIsMine(listing, walletAddress) ? "warning" : "success"}>
-                  {listingIsMine(listing, walletAddress) ? "Owned by you" : "Open listing"}
+                  {listingIsMine(listing, walletAddress) ? copy.ownedByYou : copy.openListing}
                 </Badge>
               </header>
-              <p>
-                Seller: <strong>{formatAddress(listing.seller)}</strong>
+              <p className="market-listing-meta">
+                {`${copy.sellerPrefix} ${formatAddress(listing.seller)} | `}
+                {systemState?.primaryPrice ? `Cap ${formatPol(systemState.primaryPrice)} POL` : copy.capPending}
               </p>
-              <p>
-                Price: <strong>{formatPol(listing.price)} POL</strong>
-              </p>
+              <div className="inline-actions">
+                <Tag tone="info">
+                  {fairLow !== null && fairHigh !== null
+                    ? `${formatPol(fairLow)} - ${formatPol(fairHigh)} POL`
+                    : copy.fairPending}
+                </Tag>
+                <Tag tone={listing.price > (systemState?.primaryPrice ?? listing.price) ? "warning" : "success"}>
+                  {listing.price > (systemState?.primaryPrice ?? listing.price) ? copy.aboveCap : copy.withinCap}
+                </Tag>
+              </div>
               <ButtonGroup>
                 <button
                   type="button"
@@ -443,25 +648,26 @@ export function MarketPage() {
                   onClick={() => void onBuyListing(listing)}
                   disabled={listingIsMine(listing, walletAddress)}
                 >
-                  {listingIsMine(listing, walletAddress) ? t("yourListing") : t("buySecondary")}
+                  {listingIsMine(listing, walletAddress) ? copy.yourListing : copy.buyResale}
                 </button>
                 <button type="button" className="ghost" onClick={() => toggleWatch(listing.tokenId)}>
-                  {watchlist.has(eventWatchKey(listing.tokenId)) ? t("unwatch") : t("watch")}
+                  {watchlist.has(eventWatchKey(listing.tokenId)) ? "Unwatch" : "Watch"}
                 </button>
               </ButtonGroup>
             </Card>
           ))}
         </section>
       ) : indexedReadsAvailable ? (
-        <Panel className="market-table-panel">
+        <Panel className="market-table-panel" surface="glass">
           <table className="market-table">
             <thead>
               <tr>
-                <th>Token</th>
-                <th>Seller</th>
-                <th>Price</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th>{copy.tokenHeader}</th>
+                <th>{copy.sellerHeader}</th>
+                <th>{copy.priceHeader}</th>
+                <th>{copy.fairHeader}</th>
+                <th>{copy.statusHeader}</th>
+                <th>{copy.actionsHeader}</th>
               </tr>
             </thead>
             <tbody>
@@ -470,7 +676,12 @@ export function MarketPage() {
                   <td>#{listing.tokenId.toString()}</td>
                   <td>{formatAddress(listing.seller)}</td>
                   <td>{formatPol(listing.price)} POL</td>
-                  <td>{listingIsMine(listing, walletAddress) ? "Owned by you" : "Open listing"}</td>
+                  <td>
+                    {fairLow !== null && fairHigh !== null
+                      ? `${formatPol(fairLow)} - ${formatPol(fairHigh)} POL`
+                      : "-"}
+                  </td>
+                  <td>{listingIsMine(listing, walletAddress) ? copy.ownedByYou : copy.openListing}</td>
                   <td>
                     <ButtonGroup>
                       <button
@@ -479,10 +690,10 @@ export function MarketPage() {
                         onClick={() => void onBuyListing(listing)}
                         disabled={listingIsMine(listing, walletAddress)}
                       >
-                        {listingIsMine(listing, walletAddress) ? t("yourListing") : t("buySecondary")}
+                        {listingIsMine(listing, walletAddress) ? copy.yourListing : copy.buyResale}
                       </button>
                       <button type="button" className="ghost" onClick={() => toggleWatch(listing.tokenId)}>
-                        {watchlist.has(eventWatchKey(listing.tokenId)) ? t("unwatch") : t("watch")}
+                        {watchlist.has(eventWatchKey(listing.tokenId)) ? "Unwatch" : "Watch"}
                       </button>
                     </ButtonGroup>
                   </td>
@@ -492,7 +703,6 @@ export function MarketPage() {
           </table>
         </Panel>
       ) : null}
-
     </div>
   );
 }

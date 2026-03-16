@@ -69,7 +69,7 @@ describe("TicketsPage", () => {
 
     expect(screen.getByText("Indexed enrichments delayed")).toBeInTheDocument();
     expect(
-      screen.getByText(/your passes stay visible from direct on-chain reads/i),
+      screen.getByText(/passes still load from direct chain reads/i),
     ).toBeInTheDocument();
     expect(screen.queryByText("You do not own any tickets yet.")).not.toBeInTheDocument();
   });

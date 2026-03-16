@@ -17,13 +17,13 @@ export function OnboardingGuide() {
         key: "connect",
         title: t("onboardingConnectTitle"),
         description: t("onboardingConnectDescription"),
-        route: "/app/fan",
+        route: "/app/explore",
       },
       {
         key: "buy",
         title: t("onboardingBuyTitle"),
         description: t("onboardingBuyDescription"),
-        route: "/app/fan",
+        route: "/app/explore",
       },
       {
         key: "tickets",

@@ -88,6 +88,18 @@ export interface RuntimeConfig {
   governancePortalUrl: string | null;
 }
 
+export type WorkspaceKey = "explore" | "marketplace" | "tickets" | "organizer";
+
+export type OrganizerSubrouteKey = "overview" | "scanner" | "sales" | "settings";
+
+export type EventDetailTabKey = "overview" | "rules" | "resale" | "perks" | "proof";
+
+export interface WorkspaceConfig {
+  key: WorkspaceKey;
+  path: string;
+  accent: "aurora" | "cobalt" | "mint" | "ember";
+}
+
 export type BackendHealthSeverity = "warning" | "critical";
 
 export interface BackendHealthAlert {

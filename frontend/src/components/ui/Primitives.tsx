@@ -1,7 +1,11 @@
 import { useId, useRef, useState, type HTMLAttributes, type KeyboardEvent, type ReactNode } from "react";
 
+import { useI18n } from "../../i18n/I18nContext";
+import type { WorkspaceKey } from "../../types/chainticket";
+
 type Tone = "default" | "success" | "warning" | "danger" | "info";
 type RiskTone = "neutral" | "warning" | "error" | "success";
+type Surface = "default" | "glass" | "accent" | "quiet";
 
 interface Classable {
   className?: string;
@@ -14,10 +18,11 @@ function joinClassName(...values: Array<string | undefined>): string {
 export function Panel({
   children,
   className,
+  surface = "default",
   ...props
-}: HTMLAttributes<HTMLElement> & Classable & { children: ReactNode }) {
+}: HTMLAttributes<HTMLElement> & Classable & { children: ReactNode; surface?: Surface }) {
   return (
-    <section className={joinClassName("ui-panel", className)} {...props}>
+    <section className={joinClassName("ui-panel", `surface-${surface}`, className)} {...props}>
       {children}
     </section>
   );
@@ -26,10 +31,11 @@ export function Panel({
 export function Card({
   children,
   className,
+  surface = "default",
   ...props
-}: HTMLAttributes<HTMLElement> & Classable & { children: ReactNode }) {
+}: HTMLAttributes<HTMLElement> & Classable & { children: ReactNode; surface?: Surface }) {
   return (
-    <article className={joinClassName("ui-card", className)} {...props}>
+    <article className={joinClassName("ui-card", `surface-${surface}`, className)} {...props}>
       {children}
     </article>
   );
@@ -64,6 +70,7 @@ export function PageHeader({
   primaryAction,
   secondaryActions,
   className,
+  workspace,
 }: {
   title: string;
   subtitle?: string;
@@ -71,9 +78,10 @@ export function PageHeader({
   primaryAction?: ReactNode;
   secondaryActions?: ReactNode;
   className?: string;
+  workspace?: WorkspaceKey;
 }) {
   return (
-    <header className={joinClassName("ui-page-header", className)}>
+    <header className={joinClassName("ui-page-header", workspace ? `workspace-${workspace}` : undefined, className)}>
       <div className="ui-page-header-copy">
         <h1>{title}</h1>
         {subtitle ? <p>{subtitle}</p> : null}
@@ -109,24 +117,28 @@ export function Badge({
   tone = "default",
   children,
   className,
+  emphasis = "soft",
 }: {
   tone?: Tone;
   children: ReactNode;
   className?: string;
+  emphasis?: "soft" | "solid";
 }) {
-  return <span className={joinClassName("ui-badge", tone, className)}>{children}</span>;
+  return <span className={joinClassName("ui-badge", tone, emphasis, className)}>{children}</span>;
 }
 
 export function Tag({
   tone = "default",
   children,
   className,
+  emphasis = "soft",
 }: {
   tone?: Tone;
   children: ReactNode;
   className?: string;
+  emphasis?: "soft" | "solid";
 }) {
-  return <span className={joinClassName("ui-tag", tone, className)}>{children}</span>;
+  return <span className={joinClassName("ui-tag", tone, emphasis, className)}>{children}</span>;
 }
 
 export function EmptyState({
@@ -183,14 +195,16 @@ export function ActionBar({
   secondary,
   children,
   className,
+  surface = "default",
 }: {
   primary?: ReactNode;
   secondary?: ReactNode;
   children?: ReactNode;
   className?: string;
+  surface?: Surface;
 }) {
   return (
-    <Panel className={joinClassName("ui-action-bar", className)}>
+    <Panel className={joinClassName("ui-action-bar", className)} surface={surface}>
       <div className="ui-action-top">
         {primary ? <div className="ui-action-primary">{primary}</div> : null}
         {secondary ? <div className="ui-action-secondary">{secondary}</div> : null}
@@ -232,17 +246,19 @@ export function RiskBanner({
   impact: string;
   action: string;
 }) {
+  const { locale } = useI18n();
+
   return (
     <section className={`ui-risk-banner ${tone}`} role="status" aria-live="polite">
       <h3>{title}</h3>
       <p>
-        <strong>Cause:</strong> {cause}
+        <strong>{locale === "fr" ? "Cause :" : "Cause:"}</strong> {cause}
       </p>
       <p>
-        <strong>Impact:</strong> {impact}
+        <strong>{locale === "fr" ? "Impact :" : "Impact:"}</strong> {impact}
       </p>
       <p>
-        <strong>Recommended action:</strong> {action}
+        <strong>{locale === "fr" ? "Action recommandee :" : "Recommended action:"}</strong> {action}
       </p>
     </section>
   );

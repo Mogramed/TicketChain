@@ -4,7 +4,6 @@ import { isAddress } from "ethers";
 import { Link } from "react-router-dom";
 
 import {
-  Badge,
   ButtonGroup,
   Card,
   DetailAccordion,
@@ -12,6 +11,7 @@ import {
   PageHeader,
   Panel,
   RiskBanner,
+  SectionHeader,
   Tag,
 } from "../components/ui/Primitives";
 import { useI18n } from "../i18n/I18nContext";
@@ -96,7 +96,7 @@ function formatGovernanceDelay(seconds: number): string {
 }
 
 export function OrganizerPage() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const {
     contractConfig,
     runtimeConfig,
@@ -113,10 +113,7 @@ export function OrganizerPage() {
   } = useAppState();
   const [scannerAddressInput, setScannerAddressInput] = useState("");
   const [governancePacket, setGovernancePacket] = useState<GovernancePacket | null>(null);
-  const bffClient = useMemo(
-    () => createBffClient(runtimeConfig.apiBaseUrl),
-    [runtimeConfig.apiBaseUrl],
-  );
+  const bffClient = useMemo(() => createBffClient(runtimeConfig.apiBaseUrl), [runtimeConfig.apiBaseUrl]);
   const governancePacketJson = useMemo(
     () => (governancePacket ? JSON.stringify(governancePacket, null, 2) : ""),
     [governancePacket],
@@ -137,11 +134,11 @@ export function OrganizerPage() {
 
   const opsSummaryQuery = useQuery({
     queryKey: [
-        "organizer-ops-summary",
-        contractConfig.eventId,
-        runtimeConfig.apiBaseUrl,
-        indexedReadsAvailable,
-      ],
+      "organizer-ops-summary",
+      contractConfig.eventId,
+      runtimeConfig.apiBaseUrl,
+      indexedReadsAvailable,
+    ],
     enabled: Boolean(bffClient && indexedReadsAvailable && contractConfig.eventId),
     retry: 1,
     refetchInterval: 25_000,
@@ -158,8 +155,7 @@ export function OrganizerPage() {
         (role) => role.contractScope === "ticket" && role.roleId === PAUSER_ROLE,
       ),
       scannerAdmins: roles.filter(
-        (role) =>
-          role.contractScope === "checkin_registry" && role.roleId === SCANNER_ADMIN_ROLE,
+        (role) => role.contractScope === "checkin_registry" && role.roleId === SCANNER_ADMIN_ROLE,
       ),
       scanners: roles.filter(
         (role) => role.contractScope === "checkin_registry" && role.roleId === SCANNER_ROLE,
@@ -169,13 +165,58 @@ export function OrganizerPage() {
           !(
             (role.contractScope === "ticket" && role.roleId === DEFAULT_ADMIN_ROLE) ||
             (role.contractScope === "ticket" && role.roleId === PAUSER_ROLE) ||
-            (role.contractScope === "checkin_registry" &&
-              role.roleId === SCANNER_ADMIN_ROLE) ||
+            (role.contractScope === "checkin_registry" && role.roleId === SCANNER_ADMIN_ROLE) ||
             (role.contractScope === "checkin_registry" && role.roleId === SCANNER_ROLE)
           ),
       ),
     };
   }, [opsSummaryQuery.data?.roles]);
+  const copy =
+    locale === "fr"
+      ? {
+          title: "Organizer Cockpit",
+          scannerMode: "Scanner Mode",
+          salesResale: "Ventes & revente",
+          settings: "Parametres",
+          restrictedTitle: "Zone restreinte",
+          restrictedImpact: "Les actions organizer ne peuvent pas etre signees par ce wallet.",
+          restrictedAction: "Connectez un wallet admin gouvernance, admin scanner ou pauser.",
+          systemPause: "Pause systeme",
+          collectibleMode: "Mode collectible",
+          listings: "Annonces",
+          primaryPrice: "Prix primaire",
+          operationalControls: "Controles operationnels",
+          operationalSubtitle:
+            "Les controles immediats restent sur des roles etroits, tandis que la gouvernance collectible suit un flux admin plus delibere.",
+          immediateControls: "Controles immediats",
+          immediateBody: "La pause reste disponible cote ops sans ouvrir un pouvoir de gouvernance plus large.",
+          selectedEvent: "Evenement selectionne",
+          operatorWallet: "Wallet operateur",
+          totalMinted: "Total mint",
+          notConnected: "Non connecte",
+        }
+      : {
+          title: "Organizer Cockpit",
+          scannerMode: "Scanner Mode",
+          salesResale: "Sales & Resale",
+          settings: "Settings",
+          restrictedTitle: "Restricted area",
+          restrictedImpact: "Organizer actions cannot be signed by this wallet.",
+          restrictedAction: "Connect a governance admin, scanner admin, or pauser wallet.",
+          systemPause: "System pause",
+          collectibleMode: "Collectible mode",
+          listings: "Listings",
+          primaryPrice: "Primary price",
+          operationalControls: "Operational controls",
+          operationalSubtitle:
+            "Immediate controls stay with narrow roles, while collectible governance remains a deliberate admin flow.",
+          immediateControls: "Immediate controls",
+          immediateBody: "Pause actions stay available to operations without granting broader governance power.",
+          selectedEvent: "Selected event",
+          operatorWallet: "Operator wallet",
+          totalMinted: "Total minted",
+          notConnected: "Not connected",
+        };
 
   const runPauseToggle = async (shouldPause: boolean) => {
     if (!canPauseSystem) {
@@ -284,9 +325,7 @@ export function OrganizerPage() {
         } review.`,
       );
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Unable to prepare governance packet.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Unable to prepare governance packet.");
     }
   };
 
@@ -298,17 +337,20 @@ export function OrganizerPage() {
       await navigator.clipboard.writeText(value);
       setStatusMessage(`${label} copied to clipboard.`);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : `Unable to copy ${label.toLowerCase()}.`,
-      );
+      setErrorMessage(error instanceof Error ? error.message : `Unable to copy ${label.toLowerCase()}.`);
     }
   };
 
   return (
     <div className="route-stack organizer-route" data-testid="organizer-page">
       <PageHeader
-        title={t("organizerTitle")}
-        subtitle="Operational controls stay on dedicated wallets while governance actions move through delayed admin flows."
+        title={copy.title}
+        subtitle={
+          locale === "fr"
+            ? "Le bloc ops est isole du flux fan: monitoring, roles, scanner, gouvernance et signaux de marche vivent dans un espace pro dedie."
+            : "The ops block is isolated from the fan flow: monitoring, roles, scanner, governance, and market signals live in a dedicated pro workspace."
+        }
+        workspace="organizer"
         context={
           <div className="inline-actions">
             <Tag tone={canGovern ? "success" : "warning"}>
@@ -328,76 +370,59 @@ export function OrganizerPage() {
           </button>
         }
         secondaryActions={
-          <Link to="/app/advanced" className="button-link ghost">
-            {t("navAdvanced")}
-          </Link>
+          <ButtonGroup compact>
+            <Link to="/app/organizer/scanner" className="button-link ghost">
+              {copy.scannerMode}
+            </Link>
+            <Link to="/app/organizer/sales" className="button-link ghost">
+              {copy.salesResale}
+            </Link>
+            <Link to="/app/organizer/settings" className="button-link ghost">
+              {copy.settings}
+            </Link>
+          </ButtonGroup>
         }
       />
 
       {!hasOrganizerAccess ? (
         <RiskBanner
           tone="error"
-          title="Restricted area"
+          title={copy.restrictedTitle}
           cause={t("organizerNeedsRole")}
-          impact="Organizer actions cannot be signed by this wallet."
-          action="Connect a governance admin, scanner admin, or pauser wallet."
+          impact={copy.restrictedImpact}
+          action={copy.restrictedAction}
         />
       ) : null}
 
-      <Panel className="primary-panel">
-        <section className="organizer-grid">
-          <Card>
-            <h3>Monitoring</h3>
-            <InfoList
-              entries={[
-                {
-                  label: "System pause",
-                  value: (
-                    <Badge tone={systemState?.paused ? "danger" : "success"}>
-                      {systemState?.paused ? t("enabled") : t("disabled")}
-                    </Badge>
-                  ),
-                },
-                {
-                  label: "Collectible mode",
-                  value: (
-                    <Badge tone={systemState?.collectibleMode ? "info" : "default"}>
-                      {systemState?.collectibleMode ? t("enabled") : t("disabled")}
-                    </Badge>
-                  ),
-                },
-                {
-                  label: "Primary price",
-                  value: systemState ? `${formatPol(systemState.primaryPrice)} POL` : "-",
-                },
-                {
-                  label: "Governance path",
-                  value: canGovern
-                    ? "Direct governance wallet connected"
-                    : "Timelock / multisig expected for governance actions",
-                },
-                {
-                  label: "Selected event",
-                  value: contractConfig.eventName ?? contractConfig.eventId ?? "-",
-                },
-                { label: "Operator wallet", value: walletAddress || "Not connected" },
-                { label: "Total minted", value: systemState?.totalMinted.toString() ?? "-" },
-                { label: "Listings", value: marketStats?.listingCount ?? 0 },
-                {
-                  label: "Floor",
-                  value: marketStats?.floorPrice ? `${formatPol(marketStats.floorPrice)} POL` : "-",
-                },
-                {
-                  label: "Median",
-                  value: marketStats?.medianPrice ? `${formatPol(marketStats.medianPrice)} POL` : "-",
-                },
-              ]}
-            />
-          </Card>
+      <section className="ops-metric-grid">
+        <Card className="ops-metric-card" surface="accent">
+          <span>{copy.systemPause}</span>
+          <strong>{systemState?.paused ? t("enabled") : t("disabled")}</strong>
+        </Card>
+        <Card className="ops-metric-card" surface="glass">
+          <span>{copy.collectibleMode}</span>
+          <strong>{systemState?.collectibleMode ? t("enabled") : t("disabled")}</strong>
+        </Card>
+        <Card className="ops-metric-card" surface="glass">
+          <span>{copy.listings}</span>
+          <strong>{marketStats?.listingCount ?? 0}</strong>
+        </Card>
+        <Card className="ops-metric-card" surface="glass">
+          <span>{copy.primaryPrice}</span>
+          <strong>{systemState ? `${formatPol(systemState.primaryPrice)} POL` : "-"}</strong>
+        </Card>
+      </section>
 
-          <Card className="organizer-actions">
-            <h3>Operational controls</h3>
-            <p>Immediate venue-safety actions stay on operational wallets with narrow permissions.</p>
+      <Panel className="organizer-overview-panel" surface="glass">
+        <SectionHeader
+          title={copy.operationalControls}
+          subtitle={copy.operationalSubtitle}
+        />
+
+        <section className="organizer-cockpit-grid">
+          <Card className="organizer-panel-card" surface="accent">
+            <h3>{copy.immediateControls}</h3>
+            <p>{copy.immediateBody}</p>
             <ButtonGroup>
               <button
                 type="button"
@@ -416,15 +441,18 @@ export function OrganizerPage() {
                 {t("unpauseSystem")}
               </button>
             </ButtonGroup>
-            <p>
-              Pause control requires <strong>PAUSER_ROLE</strong>. Governance-managed metadata changes are separated
-              below so this cockpit does not over-promise what ops wallets can sign.
-            </p>
+            <InfoList
+              entries={[
+                { label: copy.selectedEvent, value: contractConfig.eventName ?? contractConfig.eventId ?? "-" },
+                { label: copy.operatorWallet, value: walletAddress || copy.notConnected },
+                { label: copy.totalMinted, value: systemState?.totalMinted.toString() ?? "-" },
+              ]}
+            />
           </Card>
 
-          <Card>
+          <Card className="organizer-panel-card" surface="glass">
             <h3>Scanner role management</h3>
-            <p>Grant or revoke venue scanning rights without handing out global admin power.</p>
+            <p>Grant or revoke venue scanning rights without handing out broad admin access.</p>
             <label>
               Scanner wallet
               <input
@@ -453,7 +481,27 @@ export function OrganizerPage() {
             </ButtonGroup>
           </Card>
 
-          <Card>
+          <Card className="organizer-panel-card" surface="glass">
+            <h3>Market pulse</h3>
+            <InfoList
+              entries={[
+                { label: "Floor", value: marketStats?.floorPrice ? `${formatPol(marketStats.floorPrice)} POL` : "-" },
+                {
+                  label: "Median",
+                  value: marketStats?.medianPrice ? `${formatPol(marketStats.medianPrice)} POL` : "-",
+                },
+                {
+                  label: "Suggested list price",
+                  value: marketStats?.suggestedListPrice ? `${formatPol(marketStats.suggestedListPrice)} POL` : "-",
+                },
+              ]}
+            />
+            <Link to="/app/organizer/sales" className="button-link ghost">
+              Open sales workspace
+            </Link>
+          </Card>
+
+          <Card className="organizer-panel-card" surface="glass">
             <h3>Active operator roster</h3>
             <p>Derived from indexed admin logs for the selected event.</p>
             {!bffClient ? (
@@ -466,39 +514,20 @@ export function OrganizerPage() {
               <>
                 <InfoList
                   entries={[
-                    {
-                      label: "Governance admins",
-                      value: groupedRoles.governanceAdmins.length,
-                    },
+                    { label: "Governance admins", value: groupedRoles.governanceAdmins.length },
                     { label: "Pausers", value: groupedRoles.pausers.length },
-                    {
-                      label: "Scanner admins",
-                      value: groupedRoles.scannerAdmins.length,
-                    },
+                    { label: "Scanner admins", value: groupedRoles.scannerAdmins.length },
                     { label: "Scanners", value: groupedRoles.scanners.length },
                   ]}
                 />
-                {[
-                  ...groupedRoles.governanceAdmins,
-                  ...groupedRoles.pausers,
-                  ...groupedRoles.scannerAdmins,
-                  ...groupedRoles.scanners,
-                  ...groupedRoles.extras,
-                ].length === 0 ? (
+                {[...groupedRoles.governanceAdmins, ...groupedRoles.pausers, ...groupedRoles.scannerAdmins, ...groupedRoles.scanners, ...groupedRoles.extras]
+                  .length === 0 ? (
                   <p>No active operator roles have been indexed yet for this event.</p>
                 ) : (
                   <ul className="plain-list">
-                    {[
-                      ...groupedRoles.governanceAdmins,
-                      ...groupedRoles.pausers,
-                      ...groupedRoles.scannerAdmins,
-                      ...groupedRoles.scanners,
-                      ...groupedRoles.extras,
-                    ].map((role) => (
+                    {[...groupedRoles.governanceAdmins, ...groupedRoles.pausers, ...groupedRoles.scannerAdmins, ...groupedRoles.scanners, ...groupedRoles.extras].map((role) => (
                       <li key={`${role.contractScope}:${role.roleId}:${role.account}`}>
-                        <strong>{labelRole(role)}:</strong> {formatAddress(role.account, 6)}
-                        {" · "}
-                        synced at block {role.updatedBlock}
+                        <strong>{labelRole(role)}:</strong> {formatAddress(role.account, 6)} | synced at block {role.updatedBlock}
                       </li>
                     ))}
                   </ul>
@@ -508,28 +537,29 @@ export function OrganizerPage() {
               <p>Operator roster unavailable right now.</p>
             )}
           </Card>
+        </section>
+      </Panel>
 
-          <Card>
-            <h3>Governance controls</h3>
-            <p>
-              Collectible mode is a governance action. In production, route it through the timelock or multisig that
-              holds <code>DEFAULT_ADMIN_ROLE</code>.
-            </p>
+      <Panel className="organizer-governance-panel" surface="glass">
+        <SectionHeader
+          title="Governance controls"
+          subtitle="Collectible mode is intentionally split from day-to-day ops so the product feels more trustworthy."
+        />
+        <div className="organizer-cockpit-grid">
+          <Card className="organizer-panel-card" surface="accent">
+            <h3>Collectible mode</h3>
+            <p>In production, this should travel through a timelock or multisig that owns admin rights.</p>
             <InfoList
               entries={[
-                {
-                  label: "Collectible mode",
-                  value: (
-                    <Badge tone={systemState?.collectibleMode ? "info" : "default"}>
-                      {systemState?.collectibleMode ? t("enabled") : t("disabled")}
-                    </Badge>
-                  ),
-                },
                 {
                   label: "Execution path",
                   value: canGovern
                     ? "Direct governance wallet available in this session"
                     : "Use timelock or multisig governance flow",
+                },
+                {
+                  label: "Governance delay",
+                  value: formatGovernanceDelay(runtimeConfig.governanceMinDelaySeconds),
                 },
               ]}
             />
@@ -552,18 +582,10 @@ export function OrganizerPage() {
               </button>
             </ButtonGroup>
             <ButtonGroup compact>
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => prepareGovernancePacket(true)}
-              >
+              <button type="button" className="ghost" onClick={() => prepareGovernancePacket(true)}>
                 Prepare enable packet
               </button>
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => prepareGovernancePacket(false)}
-              >
+              <button type="button" className="ghost" onClick={() => prepareGovernancePacket(false)}>
                 Prepare disable packet
               </button>
               {runtimeConfig.governancePortalUrl ? (
@@ -578,11 +600,12 @@ export function OrganizerPage() {
               ) : null}
             </ButtonGroup>
             {!canGovern ? (
-              <p>
-                No direct governance wallet is connected, so collectible mode changes are intentionally guided through
-                a prepared governance packet in this cockpit.
-              </p>
+              <p>No direct governance wallet is connected, so collectible mode changes stay read-only in ops.</p>
             ) : null}
+          </Card>
+
+          <Card className="organizer-panel-card" surface="glass">
+            <h3>Governance packet</h3>
             {governancePacket ? (
               <div className="governance-packet-panel">
                 <InfoList
@@ -605,14 +628,6 @@ export function OrganizerPage() {
                       value: governancePacket.timelock
                         ? formatGovernanceDelay(governancePacket.timelock.minDelaySeconds)
                         : "Managed by multisig policy",
-                    },
-                    {
-                      label: "Timelock",
-                      value: governancePacket.timelock?.address ?? "Not configured",
-                    },
-                    {
-                      label: "Operation ID",
-                      value: governancePacket.timelock?.operationId ?? "Not applicable",
                     },
                   ]}
                 />
@@ -641,9 +656,7 @@ export function OrganizerPage() {
                     className="ghost"
                     onClick={() =>
                       void copyGovernanceText(
-                        governancePacket.mode === "timelock"
-                          ? "Schedule calldata"
-                          : "Governance calldata",
+                        governancePacket.mode === "timelock" ? "Schedule calldata" : "Governance calldata",
                         governancePacket.instructions[0]?.call.calldata ?? governancePacket.directCall.calldata,
                       )
                     }
@@ -677,14 +690,11 @@ export function OrganizerPage() {
                 </label>
               </div>
             ) : (
-              <p>
-                Prepare a governance packet to hand off collectible mode changes to the timelock or multisig that owns
-                admin rights.
-              </p>
+              <p>Prepare a governance packet to hand off collectible mode changes to the timelock or multisig that owns admin rights.</p>
             )}
           </Card>
 
-          <Card>
+          <Card className="organizer-panel-card" surface="glass">
             <h3>Contract addresses</h3>
             <InfoList
               entries={[
@@ -693,15 +703,11 @@ export function OrganizerPage() {
                 { label: "CheckInRegistry", value: contractConfig.checkInRegistryAddress },
               ]}
             />
-            <p>
-              Recommended governance posture: keep long-term admin rights behind a multisig or timelock, while pauser
-              and scanner-admin duties stay on operational wallets.
-            </p>
+            <p>Recommended governance posture: long-term admin rights belong behind a multisig or timelock.</p>
           </Card>
 
-          <Card>
+          <Card className="organizer-panel-card" surface="glass">
             <h3>Recent admin activity</h3>
-            <p>Latest indexed organizer actions for this event.</p>
             {!bffClient ? (
               <p>Connect the BFF to inspect recent role changes and pause actions.</p>
             ) : !indexedReadsAvailable ? (
@@ -714,9 +720,7 @@ export function OrganizerPage() {
                   <li key={activity.id}>
                     <strong>{describeActivity(activity)}</strong>
                     <div>
-                      Block {activity.blockNumber}
-                      {" · "}
-                      {activity.contractScope === "ticket" ? "TicketNFT" : "CheckInRegistry"}
+                      Block {activity.blockNumber} | {activity.contractScope === "ticket" ? "TicketNFT" : "CheckInRegistry"}
                     </div>
                   </li>
                 ))}
@@ -725,7 +729,7 @@ export function OrganizerPage() {
               <p>No admin activity has been indexed yet for this event.</p>
             )}
           </Card>
-        </section>
+        </div>
       </Panel>
 
       <DetailAccordion
